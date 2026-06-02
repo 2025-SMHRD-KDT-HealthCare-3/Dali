@@ -1,0 +1,19 @@
+# 1. 핵심 설정 사항
+node_modules
+.env
+.env.*
+
+# 2. 로그 및 디버깅 파일
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# 3. 시스템 및 버전 관리 파일 제외
+.DS_Store
+.git
+
+# 4. 도커 설정 파일은 컨테이너(실행환경) 안에 필요 없음
+Dockerfile
+.dockerignore
+docker-compose.yml

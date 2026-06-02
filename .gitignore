@@ -1,0 +1,30 @@
+# 환경변수
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+
+# Node / React
+node_modules/
+dist/
+dist-ssr/
+.vite/
+
+# 모델 파일 (용량 큰 학습 결과물)
+fastapi/model/*.pt
+fastapi/model/*.bin
+
+# logs
+*.log
+npm-debug.log*
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/

@@ -1,0 +1,34 @@
+services:
+  frontend:
+    build: ./frontend
+    container_name: dali-frontend
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - node
+
+  node:
+    build: ./node
+    container_name: dali-node
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./node:/app
+      - /app/node_modules
+    env_file:
+      - .env
+    depends_on:
+      - fastapi
+
+  fastapi:
+    build: ./fastapi
+    container_name: dali-fastapi
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./fastapi:/app
+    env_file:
+      - .env
