@@ -1,0 +1,143 @@
+/* ══════════════════════════════════════════════
+   Signup 전용 스타일
+══════════════════════════════════════════════ */
+
+/* 생년월일 라벨 */
+.field-group-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-left: 4px;
+  margin-bottom: -6px;
+}
+
+.field-group-text {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+/* 생년월일 3분할 */
+.birth-row {
+  display: flex;
+  gap: 6px;
+  width: 100%;
+}
+
+.birth-input {
+  flex: 1;
+  min-width: 0;
+  padding: 0 8px;
+}
+
+.birth-year {
+  flex: 1.5;
+}
+
+.birth-input .field-input {
+  text-align: center;
+  width: 100%;
+  padding: 16px 0;
+}
+
+/* 성별 */
+.gender-row {
+  display: flex;
+  gap: 24px;
+  padding: 4px 6px;
+}
+
+.gender-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 15px;
+  color: var(--text-secondary);
+  user-select: none;
+}
+
+.gender-option input[type='radio'] {
+  display: none;
+}
+
+.gender-radio {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid var(--text-muted);
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.2s;
+}
+
+.gender-option input[type='radio']:checked + .gender-radio {
+  border-color: var(--color-active);
+  background: radial-gradient(circle, var(--color-active) 38%, transparent 42%);
+}
+
+/* 이메일 중복확인 인라인 버튼 */
+.btn-inline {
+  flex-shrink: 0;
+  padding: 6px 12px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--color-active);
+  background: transparent;
+  color: var(--color-active);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s;
+}
+
+.btn-inline:hover {
+  background: var(--color-active);
+  color: #fff;
+}
+
+.btn-inline-done {
+  border-color: var(--color-success);
+  color: var(--color-success);
+}
+
+.input-row.input-valid {
+  border-color: var(--color-success);
+}
+
+/* 이용약관 */
+.terms-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.5;
+  user-select: none;
+}
+
+.terms-check {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.2s;
+}
+
+.terms-check.checked {
+  background: var(--color-active);
+  border-color: var(--color-active);
+}
+
+.terms-row a {
+  color: var(--color-primary-soft);
+  text-decoration: underline;
+}

@@ -1,0 +1,19 @@
+/* ══════════════════════════════════════════════
+   Login 전용 스타일
+══════════════════════════════════════════════ */
+
+.forgot-pw {
+  text-align: right;
+  margin-top: -4px;
+}
+
+.forgot-pw a {
+  font-size: 13px;
+  color: var(--text-muted);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.forgot-pw a:hover {
+  color: var(--color-primary-soft);
+}

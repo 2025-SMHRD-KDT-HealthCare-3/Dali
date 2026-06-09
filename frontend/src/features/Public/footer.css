@@ -1,0 +1,108 @@
+.footer-nav {
+  display: flex;
+  align-items: stretch;
+  background: rgba(13, 10, 45, 0.88);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+  /* 스크롤과 무관하게 항상 하단 고정 */
+  position: sticky;
+  bottom: 0;
+  z-index: 100;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.footer-tab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 10px 4px 12px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  position: relative;
+  color: rgba(255, 255, 255, 0.35);
+  transition: color 0.2s;
+  font-family: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.footer-tab:hover {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.footer-tab.active {
+  color: #b39bff;
+}
+
+/* 활성 탭 상단 라인 인디케이터 */
+.footer-tab.active::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 22%;
+  right: 22%;
+  height: 2.5px;
+  background: #b39bff;
+  border-radius: 0 0 3px 3px;
+  box-shadow: 0 0 10px rgba(179, 155, 255, 0.9);
+}
+
+/* 활성 탭 아이콘 배경 필 */
+.footer-tab.active .footer-icon-bg {
+  background: rgba(179, 155, 255, 0.15);
+}
+
+.footer-icon-bg {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 30px;
+  border-radius: 15px;
+  transition: background 0.2s;
+}
+
+.footer-label {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.3px;
+  line-height: 1;
+  transition: font-weight 0.2s;
+}
+
+.footer-tab.active .footer-label {
+  font-weight: 700;
+}
+
+/* ── 라이트 모드 ── */
+
+[data-theme="light"] .footer-nav {
+  background: rgba(240, 242, 255, 0.92);
+  border-top: 1px solid rgba(33, 20, 107, 0.1);
+}
+
+[data-theme="light"] .footer-tab {
+  color: rgba(33, 20, 107, 0.35);
+}
+
+[data-theme="light"] .footer-tab:hover {
+  color: rgba(33, 20, 107, 0.6);
+}
+
+[data-theme="light"] .footer-tab.active {
+  color: #7B5FEF;
+}
+
+[data-theme="light"] .footer-tab.active::before {
+  background: #7B5FEF;
+  box-shadow: 0 0 10px rgba(123, 95, 239, 0.6);
+}
+
+[data-theme="light"] .footer-tab.active .footer-icon-bg {
+  background: rgba(123, 95, 239, 0.1);
+}
