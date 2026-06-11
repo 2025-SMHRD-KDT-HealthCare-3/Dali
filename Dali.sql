@@ -4,20 +4,23 @@
 -- 테이블 생성 SQL - users
 
 CREATE TABLE users (
-    user_id    INT          AUTO_INCREMENT PRIMARY KEY            COMMENT '회원고유번호',
-    email      VARCHAR(255) NOT NULL                              COMMENT '이메일',
-    pwd        VARCHAR(255) NOT NULL                              COMMENT '비밀번호(식별값)',
-    nick_name  VARCHAR(20)  NOT NULL                              COMMENT '닉네임',
-    gender     CHAR(1)      NOT NULL CHECK (gender IN ('M', 'F')) COMMENT '성별',
-    birth_date DATE         NOT NULL                              COMMENT '생년월일',
-    provider   VARCHAR(20)  NOT NULL                              COMMENT '로그인제공자',
-    created_at DATETIME     NOT NULL DEFAULT NOW()                COMMENT '가입일자',
+    user_id      INT          AUTO_INCREMENT PRIMARY KEY            COMMENT '회원고유번호',
+    email        VARCHAR(255) NOT NULL                              COMMENT '이메일',
+    pwd          VARCHAR(255) NULL                                  COMMENT '비밀번호',
+    nick_name    VARCHAR(20)  NOT NULL                              COMMENT '닉네임',
+    gender       CHAR(1)      NOT NULL CHECK (gender IN ('M', 'F')) COMMENT '성별',
+    birth_date   DATE         NOT NULL                              COMMENT '생년월일',
+    provider     VARCHAR(20)  NOT NULL                              COMMENT '로그인제공자',
+    sns_id       VARCHAR(255) NULL                                  COMMENT 'SNS 식별값',
+    persona      VARCHAR(30)  NULL CHECK (persona IN ('공감형', '친구형', '분석형', '동기부여형')) COMMENT '페르소나',
+    p_checked_at DATETIME     NULL                                  COMMENT '페르소나 선택일시',
+    created_at   DATETIME     NOT NULL DEFAULT NOW()                COMMENT '가입일자',
     
     -- 유니크 제약조건 내부 선언
     UNIQUE (email),
     
     -- 일반 인덱스 내부 선언
-    INDEX IX_users_1 (email, name, created_at)
+    INDEX IX_users_1 (email, nick_name, created_at)
 ) COMMENT='회원. 사용자 기본 정보';
 
 
@@ -27,15 +30,18 @@ CREATE TABLE users (
 CREATE TABLE onboardings (
     onboarding_id INT           AUTO_INCREMENT PRIMARY KEY                                     COMMENT '온보딩고유번호',
     user_id       INT           NOT NULL                                                       COMMENT '회원고유번호',
-    question      TEXT          NOT NULL                                                       COMMENT '질의',
+    question_no   TINYINT       NOT NULL CHECK (question_no IN (1,2,3,4))                      COMMENT '질문번호',
+    question      TEXT          NOT NULL                                                       COMMENT '질문',
     exp_1         VARCHAR(1000) NOT NULL                                                       COMMENT '보기 1',
     exp_2         VARCHAR(1000) NOT NULL                                                       COMMENT '보기 2',
     exp_3         VARCHAR(1000) NOT NULL                                                       COMMENT '보기 3',
     exp_4         VARCHAR(1000) NOT NULL                                                       COMMENT '보기 4',
     exp_5         VARCHAR(1000) NULL                                                           COMMENT '보기 5',
     user_answer   TINYINT       NOT NULL CHECK (user_answer IN (1, 2, 3, 4, 5))                COMMENT '사용자 선택',
-    persona       VARCHAR(30)   NOT NULL CHECK (persona IN ('공감형', '친구형', '분석형', '동기부여형')) COMMENT '페르소나',
     created_at    DATETIME      NOT NULL DEFAULT NOW()                                         COMMENT '등록일자',
+
+    -- 유니크 제약조건 내부 선언
+    UNIQUE (user_id, question_no),
     
     -- Index 설정 - onboardings(created_at)
     INDEX IX_onboardings_1 (created_at),
@@ -132,7 +138,7 @@ CREATE TABLE log_analyses (
 
 CREATE TABLE session_analyses (
     session_analysis_id INT          AUTO_INCREMENT PRIMARY KEY COMMENT '세션분석고유번호',
-    session_id          INT          NOT NULL                   COMMENT '세션고유번호',
+    session_id          INT          NOT NULL UNIQUE            COMMENT '세션고유번호',
     user_id             INT          NOT NULL                   COMMENT '회원고유번호',
     joy_score           DECIMAL(4,1) NOT NULL                   COMMENT '기쁨점수',
     sad_score           DECIMAL(4,1) NOT NULL                   COMMENT '슬픔점수',
@@ -250,7 +256,7 @@ CREATE TABLE missions (
     completed_at    DATETIME     NULL                                           COMMENT '수행일시',
     
     -- Unique 제약조건 내부 선언 (해당 일자의 미션 순번 중복 방지)
-    UNIQUE (mission_date, mission_seq),
+    UNIQUE (user_id, mission_date, mission_seq),
     
     -- Foreign Key 설정 - missions(user_id) -> users(user_id)
     CONSTRAINT fk_missions_users FOREIGN KEY (user_id) 
