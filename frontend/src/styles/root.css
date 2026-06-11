@@ -1,0 +1,128 @@
+:root {
+  /* ════════════════════════════════════════════════
+     Dali Brand Colors (공식 디자인 시스템 기준)
+     ════════════════════════════════════════════════ */
+
+  /* Primary — Night Purple */
+  --color-primary:        #21146B;   /* Primary Night Purple */
+  --color-primary-light:  #38248C;   /* Deep Violet */
+  --color-primary-cta:    #7c5ad7;   /* CTA Purple  — 버튼, 활성 탭 */
+  --color-primary-soft:   #B39BFF;   /* Soft Lavender — 강조, Secondary */
+
+  /* Accent — Moon & Warm */
+  --color-moon:           #F6E39A;   /* Moon Cream  — 달, 포인트 아이콘 */
+  --color-mascot:         #C97A43;   /* Mascot Brown */
+  --color-warm:           #F4E2CB;   /* Warm Beige */
+
+  /* Text */
+  --color-text-white:     #F8F5FF;   /* Text White  — 기본 텍스트 */
+
+  /* ════════════════════════════════════════════════
+     Semantic / UI Tokens
+     ════════════════════════════════════════════════ */
+
+  /* Background */
+  --bg-screen:
+    radial-gradient(ellipse at 22% 8%,  rgba(70, 30, 155, 0.72) 0%, transparent 46%),
+    radial-gradient(ellipse at 78% 92%, rgba(45, 15, 105, 0.58) 0%, transparent 42%),
+    linear-gradient(172deg, #0c0927 0%, #141245 28%, #1e155a 62%, #21146b 100%);
+  --bg-base:              #12102A;   /* 최하단 배경 */
+  --bg-surface:           #1A1650;   /* 카드, 패널 배경 */
+  --bg-elevated:          #21196B;   /* 탭 바, 입력 컨테이너 */
+  --bg-input:             #1c184a;  /* 인풋 필드 배경 */
+  --bg-input-focus:       rgba(255, 255, 255, 0.1);  /* 인풋 포커스 */
+  --bg-social:            rgba(255, 255, 255, 0.06);  /* SNS 버튼 배경 */
+  --bg-social-hover:      rgba(255, 255, 255, 0.11);  /* SNS 버튼 hover */
+
+  /* Border */
+  --border-default:       rgba(255, 255, 255, 0.1);
+  --border-focus:         var(--color-primary-cta);
+  --border-subtle:        rgba(255, 255, 255, 0.10);
+
+  /* Text */
+  --text-primary:         var(--color-text-white);   /* #F8F5FF */
+  --text-secondary:       var(--color-primary-soft);  /* #B39BFF */
+  --text-muted:           #7B72CC;
+  --text-disabled:        #4A4490;
+
+  /* Interactive */
+  --color-active:         var(--color-primary-cta);   /* #8C63FF */
+  --color-hover:          var(--color-primary-light);  /* #38248C */
+
+  /* Status */
+  --color-success:        #2ecc71;
+  --color-error:          #e74c3c;
+  --color-warning:        var(--color-moon);           /* #F6E39A */
+
+  /* Social Brand */
+  --color-google:         #1C1848;
+  --color-naver:          #03C75A;
+  --color-kakao:          #FEE500;
+
+  /* ════════════════════════════════════════════════
+     Spacing
+     ════════════════════════════════════════════════ */
+  --space-xs:   4px;
+  --space-sm:   8px;
+  --space-md:   16px;
+  --space-lg:   24px;
+  --space-xl:   32px;
+  --space-2xl:  48px;
+
+  /* ════════════════════════════════════════════════
+     Border Radius
+     ════════════════════════════════════════════════ */
+  --radius-sm:   8px;
+  --radius-md:   10px;
+  --radius-lg:   12px;
+  --radius-xl:   16px;
+  --radius-full: 9999px;
+
+  /* ════════════════════════════════════════════════
+     Shadow
+     ════════════════════════════════════════════════ */
+  --shadow-primary: 0 4px 20px rgba(140, 99, 255, 0.45);
+  --shadow-card:    0 8px 32px rgba(0, 0, 0, 0.5);
+  --shadow-moon:    0 0 28px rgba(246, 227, 154, 0.5);
+}
+
+/* ════════════════════════════════════════════════
+   Light Theme Overrides  (Dali Design Board 기준)
+   ════════════════════════════════════════════════ */
+
+[data-theme="light"] {
+  /* Background — 연한 하늘빛 그라디언트 */
+  --bg-screen:
+    radial-gradient(ellipse at 20% 10%,  rgba(140, 99, 255, 0.12) 0%, transparent 48%),
+    radial-gradient(ellipse at 80% 90%,  rgba(100, 140, 255, 0.10) 0%, transparent 44%),
+    linear-gradient(170deg, #EEF3FF 0%, #E8EDFF 30%, #E2E8FF 62%, #DCE3FF 100%);
+
+  --bg-base:          #EEF3FF;
+  --bg-surface:       #F5F7FF;
+  --bg-elevated:      #FFFFFF;
+  --bg-input:         #F0F2FF;
+  --bg-input-focus:   rgba(140, 99, 255, 0.09);
+  --bg-social:        rgba(255, 255, 255, 0.75);
+  --bg-social-hover:  rgba(255, 255, 255, 0.95);
+
+  /* Border */
+  --border-default:   rgba(33, 20, 107, 0.13);
+  --border-focus:     var(--color-primary-cta);
+  --border-subtle:    rgba(33, 20, 107, 0.08);
+
+  /* Text — 다크 퍼플 계열 */
+  --text-primary:     #21146B;
+  --text-secondary:   #38248C;
+  --text-muted:       #7B72CC;
+  --text-disabled:    #B0A8DD;
+  --color-text-white: #21146B;
+
+  /* Interactive */
+  --color-active:     var(--color-primary-cta);
+  --color-hover:      #E8EDFF;
+
+  /* Shadow */
+  --shadow-card:    0 8px 32px rgba(33, 20, 107, 0.09);
+  --shadow-primary: 0 4px 20px rgba(140, 99, 255, 0.25);
+  --shadow-moon:    0 0 28px rgba(140, 99, 255, 0.3);
+}
