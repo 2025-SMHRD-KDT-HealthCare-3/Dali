@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import './main.css'
 import { useTheme } from '../../contexts/ThemeContext'
+import ThemeToggle  from '../Public/ThemeToggle'
 
 import logoDarkImg  from '../../assets/dark/달리로고.png'
 import logoLightImg from '../../assets/light/달리라이트로고.png'
@@ -44,9 +45,10 @@ const Main = () => {
         <div className="bg-cloud bc3" />
       </div>
 
+      <ThemeToggle className="main-theme-toggle" />
+
       <div className="main-inner">
 
-        {/* 뒤로가기 */}
         <button className="main-back-btn" onClick={() => navigate('/')} aria-label="뒤로가기">‹</button>
 
         {/* 로고 배너 */}
@@ -120,12 +122,12 @@ const Main = () => {
         <div className="main-actions">
           <button
             className={`main-btn-next${!selected ? ' is-disabled' : ''}`}
-            onClick={() => selected && navigate('/chat')}
+            onClick={() => selected && navigate('/chat', { state: { isOnboarding: true, emotion: selected } })}
           >
             {selected ? '다음' : '감정을 선택해주세요'} <span className="btn-arrow">›</span>
           </button>
           <div className="main-footer-links">
-            <button className="main-skip" onClick={() => navigate('/chat')}>잘 모르겠어요</button>
+            <button className="main-skip" onClick={() => navigate('/chat', { state: { isOnboarding: true } })}>잘 모르겠어요</button>
             <span className="main-sep" aria-hidden="true">|</span>
             <button className="main-skip" onClick={() => navigate('/chat')}>건너뛰기</button>
           </div>

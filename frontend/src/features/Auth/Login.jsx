@@ -1,5 +1,8 @@
 import React, { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import './Login.css'
+import { authApi } from '../../api/auth'
+import { setAccessToken } from '../../api/client'
 import googleImg from '../../assets/public/구글.png'
 import naverImg  from '../../assets/public/네이버.png'
 import kakaoImg  from '../../assets/public/카카오.png'
@@ -32,11 +35,34 @@ const EyeIcon = ({ visible }) => visible ? (
 )
 
 const Login = () => {
+  const navigate = useNavigate()
   const [showPw, setShowPw] = useState(false)
   const [form, setForm] = useState({ email: '', password: '' })
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
 
-  const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value })
-  const handleSubmit = (e) => { e.preventDefault() /* TODO: API 연동 */ }
+  const handleChange = (e) => {
+    setForm({ ...form, [e.target.name]: e.target.value })
+    setError('')
+  }
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    if (!form.email || !form.password) {
+      setError('이메일과 비밀번호를 입력해주세요.')
+      return
+    }
+    setLoading(true)
+    try {
+      const res = await authApi.login({ email: form.email, pwd: form.password })
+      if (res.access_token) setAccessToken(res.access_token)
+      navigate(res.user?.onboarding_completed ? '/main' : '/onboarding')
+    } catch (err) {
+      setError(err.message || '로그인에 실패했습니다.')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   return (
     <form className="auth-form" onSubmit={handleSubmit}>
@@ -58,13 +84,15 @@ const Login = () => {
         </button>
       </div>
 
+      {error && <p className="form-error">{error}</p>}
+
       <div className="forgot-pw">
         <a href="#">비밀번호를 잊으셨나요?</a>
       </div>
 
-      <button type="submit" className="btn-cta">
+      <button type="submit" className="btn-cta" disabled={loading}>
         <span className="sparkle">✦</span>
-        로그인
+        {loading ? '로그인 중...' : '로그인'}
         <span className="sparkle">✦</span>
       </button>
 

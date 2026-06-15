@@ -7,6 +7,10 @@ import Splash    from './features/Splash/Splash'
 import Main      from './features/Main/Main'
 import Chat      from './features/Chat/Chat'
 import Settings  from './features/Settings/Settings'
+import Mission      from './features/Mission/Mission'
+import Report       from './features/Report/Report'
+import Onboarding   from './features/Onboarding/Onboarding'
+import Info         from './features/Info/Info'
 
 const FOOTER_PATHS = ['/main', '/report', '/mission', '/settings']
 
@@ -24,6 +28,10 @@ function App() {
           <Route path="/main"    element={<Main />} />
           <Route path="/chat"     element={<Chat />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/mission"     element={<Mission />} />
+          <Route path="/report"      element={<Report />} />
+          <Route path="/onboarding"  element={<Onboarding />} />
+          <Route path="/info"        element={<Info />} />
           <Route path="*"         element={<Navigate to="/" replace />} />
         </Routes>
         {showFooter && <Footer />}

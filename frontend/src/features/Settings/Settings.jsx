@@ -23,7 +23,7 @@ const Settings = () => {
   const { isDark, toggleTheme } = useTheme()
 
   const MENU_ITEMS = [
-    { id: 'profile',  img: isDark ? icProfileDark  : icProfileLight,   label: '개인정보 수정',      type: 'arrow'  },
+    { id: 'profile',  img: isDark ? icProfileDark  : icProfileLight,   label: '개인정보 수정',      type: 'arrow', to: '/info' },
     { id: 'theme',    img: isDark ? icDarkModeDark : icLightModeLight,  label: '라이트 / 다크 모드', type: 'toggle' },
     { id: 'security', img: isDark ? icSecurityDark : icSecurityLight,   label: '권한 관리',          type: 'arrow'  },
     { id: 'alarm',    img: isDark ? icAlarmDark    : icAlarmLight,      label: '알림설정',           type: 'arrow'  },
@@ -70,7 +70,7 @@ const Settings = () => {
         {/* 메뉴 목록 */}
         <div className="settings-list">
           {MENU_ITEMS.map(item => (
-            <div key={item.id} className="settings-item">
+            <div key={item.id} className="settings-item" onClick={() => item.to && navigate(item.to)}>
               <div className="settings-icon-wrap">
                 <img src={item.img} alt={item.label} className="set-icon-img" />
               </div>

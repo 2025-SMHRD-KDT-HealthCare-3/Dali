@@ -6,6 +6,7 @@ import Signup from './Signup'
 import daliLogoDark  from '../../assets/dark/달리로고.png'
 import daliLogoLight from '../../assets/light/달리라이트로고.png'
 import { useTheme } from '../../contexts/ThemeContext'
+import ThemeToggle  from '../Public/ThemeToggle'
 
 const BackIcon = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -22,6 +23,8 @@ const Auth = () => {
 
   return (
     <div className="auth-form-panel">
+
+      <ThemeToggle className="auth-theme-toggle" />
 
       {/* 배경 장식 */}
       <div className="auth-bg" aria-hidden="true">
