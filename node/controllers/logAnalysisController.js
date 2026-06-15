@@ -1,0 +1,25 @@
+/*
+ * logAnalysisController - 발화별 감정 분석 (log_analyses)
+ * - getLogAnalysesBySession : GET /api/log-analyses?session_id=X  세션의 발화별 감정 분석 목록
+ */
+
+const logAnalysisRepo = require('../repositories/logAnalysisRepository');
+const sessionRepo = require('../repositories/sessionRepository');
+
+async function getLogAnalysesBySession(req, res) {
+  const { session_id } = req.query;
+  if (!session_id) {
+    return res.status(400).json({ message: 'session_id 쿼리 파라미터를 입력해주세요.' });
+  }
+
+  const session = await sessionRepo.findSessionById(session_id);
+  if (!session) return res.status(404).json({ message: '세션을 찾을 수 없습니다.' });
+  if (session.user_id !== req.user.user_id) {
+    return res.status(403).json({ message: '접근 권한이 없습니다.' });
+  }
+
+  const analyses = await logAnalysisRepo.findBySessionId(session_id);
+  res.json({ analyses });
+}
+
+module.exports = { getLogAnalysesBySession };
