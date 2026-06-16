@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import './Login.css'
 import { authApi } from '../../api/auth'
-import { setAccessToken } from '../../api/client'
+import { useAuth } from '../../contexts/AuthContext'
 import googleImg from '../../assets/public/구글.png'
 import naverImg  from '../../assets/public/네이버.png'
 import kakaoImg  from '../../assets/public/카카오.png'
@@ -36,6 +36,7 @@ const EyeIcon = ({ visible }) => visible ? (
 
 const Login = () => {
   const navigate = useNavigate()
+  const { login } = useAuth()
   const [showPw, setShowPw] = useState(false)
   const [form, setForm] = useState({ email: '', password: '' })
   const [error, setError] = useState('')
@@ -55,8 +56,8 @@ const Login = () => {
     setLoading(true)
     try {
       const res = await authApi.login({ email: form.email, pwd: form.password })
-      if (res.access_token) setAccessToken(res.access_token)
-      navigate('/main')
+      if (res.access_token) login(res.access_token, res.user)
+      navigate(res.user?.onboarding_completed ? '/main' : '/onboarding')
     } catch (err) {
       setError(err.message || '로그인에 실패했습니다.')
     } finally {

@@ -1,7 +1,10 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import axios from 'axios'
 import './chat.css'
+import { onboardingApi } from '../../api/onboarding'
+import { sessionApi } from '../../api/sessions'
+import { chatApi } from '../../api/chat'
+import { useAuth } from '../../contexts/AuthContext'
 import chatBgDark     from '../../assets/dark/챗봇 배경.png'
 import chatBgLight    from '../../assets/light/챗봇 배경 라이트.png'
 import daliProfileImg from '../../assets/public/달리 프로필.png'
@@ -10,16 +13,35 @@ import ThemeToggle    from '../Public/ThemeToggle'
 import MessageBubble  from '../Public/MessageBubble'
 import TypingBubble   from '../Public/TypingBubble'
 
-/* ── 온보딩 질문 명세 (emotion 은 Main에서 이미 선택) ── */
+/* ── 온보딩 질문 명세 (emotion 은 Main에서 이미 선택 → question_no:1로 별도 제출) ── */
 const OB_QUESTIONS = [
   { key: 'gender',        cond: true,  text: '먼저 성별을 알려주실 수 있어요?',                        type: 'qr',   opts: ['여성', '남성', '응답 안 함'] },
   { key: 'birthdate',     cond: true,  text: '생년월일은 언제예요?',                                 type: 'date', placeholder: '날짜를 선택해주세요' },
   { key: 'nickname',      cond: true,  text: '어떻게 불러드릴까요? 닉네임을 알려주세요 😊',             type: 'text', placeholder: '닉네임을 입력해주세요' },
-  { key: 'energy',        cond: false, text: '요즘 하루 에너지 수준은 어떤가요?',                      type: 'qr',   opts: ['일상적인 일을 해낼 만큼 활력이 있어요', '생각이 많고 복잡해서 정신적인 에너지가 부족해요', '꼭 해야 할 일만 겨우 하거나 자꾸 미루게 돼요', '하루를 버티는 것도 힘들어요'] },
-  { key: 'topic',         cond: false, text: '최근 가장 신경 쓰이는 영역은 무엇인가요?',               type: 'qr',   opts: ['학업 및 진로 방향', '직장 업무와 성과', '가족, 친구, 연인 등 대인관계', '나 자신에 대한 성격이나 자존감', '특별한 고민은 없어요'] },
-  { key: 'coachingStyle', cond: false, text: '달리와 어떤 시간을 보내고 싶나요?',                     type: 'qr',   opts: ['친구처럼 편하게 이야기하고 싶어요', '복잡한 마음을 정리하고 싶어요', '작은 것부터 다시 시작하고 싶어요', '따뜻한 위로를 받고 싶어요'] },
+  { key: 'energy',        cond: false, question_no: 2, text: '요즘 하루 에너지 수준은 어떤가요?',      type: 'qr',   opts: ['일상적인 일을 해낼 만큼 활력이 있어요', '생각이 많고 복잡해서 정신적인 에너지가 부족해요', '꼭 해야 할 일만 겨우 하거나 자꾸 미루게 돼요', '하루를 버티는 것도 힘들어요'] },
+  { key: 'topic',         cond: false, question_no: 3, text: '최근 가장 신경 쓰이는 영역은 무엇인가요?', type: 'qr',  opts: ['학업 및 진로 방향', '직장 업무와 성과', '가족, 친구, 연인 등 대인관계', '나 자신에 대한 성격이나 자존감', '특별한 고민은 없어요'] },
+  { key: 'coachingStyle', cond: false, question_no: 4, text: '달리와 어떤 시간을 보내고 싶나요?',      type: 'qr',   opts: ['친구처럼 편하게 이야기하고 싶어요', '복잡한 마음을 정리하고 싶어요', '작은 것부터 다시 시작하고 싶어요', '따뜻한 위로를 받고 싶어요'] },
   { key: 'checkinTime',   cond: false, text: '하루 중 달리와 마음을 나누기 좋은 시간대는 언제예요?',    type: 'qr',   opts: ['아침', '낮', '저녁', '밤'] },
 ]
+
+// Onboarding Q1 선택지
+const EMOTION_OPTS = ['생각이 많고 복잡해요', '마음이 조금 지쳐있어요', '아무것도 하기 싫어요', '편하게 이야기하고 싶어요']
+
+// Main.jsx 감정 ID → 한국어 이름 (세션 selected_emotion으로 전달)
+const EMOTION_LABEL = {
+  joy: '기쁨', sad: '슬픔', anxiety: '불안',
+  anger: '분노', confused: '당황', hurt: '상처',
+}
+
+// Main.jsx 감정 아이콘 ID → Q1 user_answer 인덱스 매핑
+const EMOTION_ID_TO_IDX = {
+  anxiety:  1,  // 불안 → 생각이 많고 복잡해요
+  confused: 1,  // 당황 → 생각이 많고 복잡해요
+  sad:      2,  // 슬픔 → 마음이 조금 지쳐있어요
+  hurt:     2,  // 상처 → 마음이 조금 지쳐있어요
+  anger:    3,  // 분노 → 아무것도 하기 싫어요
+  joy:      4,  // 기쁨 → 편하게 이야기하고 싶어요
+}
 
 const QUICK_CHIPS = [
   { id: 'anxiety', label: '조금 불안해',         icon: '🐾' },
@@ -58,6 +80,7 @@ const Chat = () => {
   const navigate  = useNavigate()
   const location  = useLocation()
   const { isDark } = useTheme()
+  const { user, isAuthenticated } = useAuth()
   const bottomRef = useRef(null)
 
   const locState    = location.state || {}
@@ -71,8 +94,52 @@ const Chat = () => {
 
   const obQuestions = useMemo(() => {
     const prefill = { emotion: locState.emotion }
+
+    if (isAuthenticated && user) {
+      if (user.gender)     prefill.gender    = user.gender
+      if (user.birth_date) prefill.birthdate = user.birth_date
+      if (user.nick_name)  prefill.nickname  = user.nick_name
+    } else {
+      try {
+        const stored = sessionStorage.getItem('dali_guest_profile')
+        if (stored) {
+          const p = JSON.parse(stored)
+          if (!p.expires || Date.now() < p.expires) {
+            if (p.gender)     prefill.gender    = p.gender
+            if (p.birth_date) prefill.birthdate = p.birth_date
+            if (p.nick_name)  prefill.nickname  = p.nick_name
+          }
+        }
+      } catch {}
+    }
+
     return OB_QUESTIONS.filter(q => !q.cond || !prefill[q.key])
-  }, []) // mount 시 한 번만 계산
+  }, [isAuthenticated, user])
+
+  /* ── 세션 상태 ── */
+  const [sessionId, setSessionId] = useState(null)
+  const sessionIdRef = useRef(null)
+
+  const startSession = async (emotionId) => {
+    if (!isAuthenticated) return
+    try {
+      const emotion = EMOTION_LABEL[emotionId] || emotionId
+      const res = await sessionApi.startSession(emotion)
+      setSessionId(res.session_id)
+      sessionIdRef.current = res.session_id
+    } catch (err) {
+      console.error('[chat] 세션 시작 실패:', err)
+    }
+  }
+
+  // 화면 떠날 때 세션 종료
+  useEffect(() => {
+    return () => {
+      if (sessionIdRef.current) {
+        sessionApi.endSession(sessionIdRef.current).catch(() => {})
+      }
+    }
+  }, [])
 
   /* ── 메시지 / 입력 상태 ── */
   const [messages, setMessages] = useState(() =>
@@ -80,11 +147,19 @@ const Chat = () => {
   )
   const [isTyping, setIsTyping] = useState(startInOb)
   const [input,    setInput]    = useState('')
+  const [isRisk,   setIsRisk]   = useState(false)
 
   const addDali = (text) =>
     setMessages(prev => [...prev, { id: Date.now() + Math.random(), role: 'dali', text, time: now() }])
   const addUser = (text) =>
     setMessages(prev => [...prev, { id: Date.now() + Math.random(), role: 'user',  text, time: now(), read: false }])
+
+  /* ── 온보딩 없이 바로 채팅 진입 시 세션 시작 ── */
+  useEffect(() => {
+    if (!startInOb) {
+      startSession(locState.emotion)
+    }
+  }, [])
 
   /* ── 온보딩 시작 인사 ── */
   useEffect(() => {
@@ -131,6 +206,7 @@ const Chat = () => {
         addDali('다 물어봤어요! 이제 함께 이야기해요 🌙✨')
         setIsTyping(false)
         submitOnboarding(newAnswers)
+        startSession(newAnswers.emotion || locState.emotion)
         setTimeout(() => {
           setObMode(false)
           setObPhase('idle')
@@ -142,24 +218,66 @@ const Chat = () => {
   }
 
   const submitOnboarding = async (all) => {
-    try {
-      await axios.post('/onboarding', {
-        emotion:       all.emotion,
-        energy:        all.energy,
-        topic:         all.topic,
-        coachingStyle: all.coachingStyle,
-        checkinTime:   all.checkinTime,
-      })
-    } catch (err) {
-      console.error('[chat ob]', err)
+    const questionsToSubmit = [
+      { question_no: 1, text: '요즘 당신의 마음은 어떤가요?', opts: EMOTION_OPTS, key: 'emotion' },
+      ...OB_QUESTIONS.filter(q => q.question_no),
+    ]
+
+    for (const q of questionsToSubmit) {
+      let optionIdx
+      if (q.key === 'emotion') {
+        // Main.jsx의 감정 아이콘 ID → Q1 인덱스 변환
+        optionIdx = EMOTION_ID_TO_IDX[all.emotion] || 0
+      } else {
+        const textAnswer = all[q.key]
+        if (!textAnswer) continue
+        optionIdx = q.opts.indexOf(textAnswer) + 1
+      }
+      if (!optionIdx) continue
+      try {
+        await onboardingApi.saveAnswer({
+          question_no: q.question_no,
+          question:    q.text,
+          exp_1: q.opts[0],
+          exp_2: q.opts[1],
+          exp_3: q.opts[2],
+          exp_4: q.opts[3],
+          exp_5: q.opts[4] || null,
+          user_answer: optionIdx,
+        })
+      } catch (err) {
+        console.error(`[chat ob] Q${q.question_no} 저장 실패:`, err)
+      }
     }
   }
 
   /* ── 일반 채팅 메시지 전송 ── */
-  const sendMessage = (text) => {
-    if (!text.trim()) return
-    addUser(text.trim())
+  const sendMessage = async (text) => {
+    if (!text.trim() || isRisk) return
+    const trimmed = text.trim()
+    addUser(trimmed)
     setInput('')
+    setIsTyping(true)
+
+    try {
+      const body = { message: trimmed }
+      if (isAuthenticated && sessionId) body.session_id = sessionId
+
+      const res = await chatApi.sendMessage(body)
+
+      if (res.is_risk) {
+        setIsRisk(true)
+        setSessionId(null)
+        sessionIdRef.current = null
+        addDali('지금 많이 힘드신 것 같아요. 혼자 버티지 않아도 돼요.\n\n📞 자살예방상담전화: 1393\n📞 정신건강위기상담전화: 1577-0199\n\n언제든 다시 찾아와 주세요 🌙')
+      } else {
+        addDali(res.reply || '...')
+      }
+    } catch {
+      addDali('죄송해요, 잠시 연결이 끊겼어요. 다시 시도해주세요.')
+    } finally {
+      setIsTyping(false)
+    }
   }
 
   /* ── 전송 버튼 통합 핸들러 ── */
