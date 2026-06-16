@@ -118,7 +118,7 @@ const Signup = () => {
         terms_agreed: true,
       })
       if (res.access_token) setAccessToken(res.access_token)
-      navigate('/onboarding')
+      navigate('/login')
     } catch (err) {
       setErrors(e => ({ ...e, submit: err.message || '회원가입에 실패했습니다.' }))
     } finally {
@@ -162,14 +162,14 @@ const Signup = () => {
       {/* 성별 */}
       <div className="gender-row">
         <label className="gender-option">
-          <input type="radio" name="gender" value="male"
-            checked={form.gender === 'male'} onChange={handleChange} />
+          <input type="radio" name="gender" value="M"
+            checked={form.gender === 'M'} onChange={handleChange} />
           <span className="gender-radio" />
           남
         </label>
         <label className="gender-option">
-          <input type="radio" name="gender" value="female"
-            checked={form.gender === 'female'} onChange={handleChange} />
+          <input type="radio" name="gender" value="F"
+            checked={form.gender === 'F'} onChange={handleChange} />
           <span className="gender-radio" />
           여
         </label>

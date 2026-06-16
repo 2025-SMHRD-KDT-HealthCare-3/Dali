@@ -56,7 +56,7 @@ const Login = () => {
     try {
       const res = await authApi.login({ email: form.email, pwd: form.password })
       if (res.access_token) setAccessToken(res.access_token)
-      navigate(res.user?.onboarding_completed ? '/main' : '/onboarding')
+      navigate('/main')
     } catch (err) {
       setError(err.message || '로그인에 실패했습니다.')
     } finally {
