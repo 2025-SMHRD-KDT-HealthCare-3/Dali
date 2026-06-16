@@ -6,6 +6,11 @@
 
 const pool = require('../config/db');
 
+async function findById(mission_id) {
+  const [rows] = await pool.query('SELECT * FROM missions WHERE mission_id = ?', [mission_id]);
+  return rows[0];
+}
+
 async function findMissionsByUser(user_id) {
   const [rows] = await pool.query(
     'SELECT * FROM missions WHERE user_id = ? ORDER BY mission_date DESC, mission_seq ASC',
@@ -33,4 +38,4 @@ async function createMissions(user_id, session_id, missions) {
   );
 }
 
-module.exports = { createMissions, findMissionsByUser, completeMission };
+module.exports = { findById, createMissions, findMissionsByUser, completeMission };

@@ -1,8 +1,10 @@
 /*
  * sessionController - 대화 세션 관리
- * - startSession : POST  /api/sessions          감정 선택 및 세션 시작
- * - endSession   : PATCH /api/sessions/:id/end  세션 종료
- * - getSessions  : GET   /api/sessions          내 세션 목록 조회
+ * - startSession      : POST  /api/sessions              감정 선택 및 세션 시작
+ * - endSession        : PATCH /api/sessions/:id/end      세션 종료
+ * - getSessions       : GET   /api/sessions              내 세션 목록 조회 (페이지네이션)
+ * - getSessionById    : GET   /api/sessions/:id          세션 상세 조회 (IDOR 차단)
+ * - getSessionMessages: GET   /api/sessions/:id/messages 세션 대화 히스토리 조회
  */
 
 const axios = require('axios');
@@ -17,7 +19,7 @@ const ALERT_EMOTIONS = ['슬픔', '불안', '분노', '상처'];
 async function startSession(req, res) {
   const { selected_emotion } = req.body;
   if (!selected_emotion) {
-    return res.status(400).json({ message: '감정을 선택해주세요.' });
+    return res.status(400).json({ code: 'INVALID_REQUEST', message: '감정을 선택해주세요.' });
   }
 
   const sessionId = await sessionRepo.createSession({
@@ -33,10 +35,10 @@ async function endSession(req, res) {
   const session = await sessionRepo.findSessionById(id);
 
   if (!session) {
-    return res.status(404).json({ message: '세션을 찾을 수 없습니다.' });
+    return res.status(404).json({ code: 'NOT_FOUND', message: '세션을 찾을 수 없습니다.' });
   }
   if (session.user_id !== req.user.user_id) {
-    return res.status(403).json({ message: '접근 권한이 없습니다.' });
+    return res.status(403).json({ code: 'FORBIDDEN', message: '접근 권한이 없습니다.' });
   }
 
   await sessionRepo.endSession(id);
@@ -50,7 +52,7 @@ async function endSession(req, res) {
       { headers: { 'X-Internal-API-Key': process.env.INTERNAL_API_KEY } }
     ));
   } catch {
-    return res.status(502).json({ message: '세션 분석에 실패했습니다. 잠시 후 다시 시도해주세요.' });
+    return res.status(502).json({ code: 'BAD_GATEWAY', message: '세션 분석에 실패했습니다. 잠시 후 다시 시도해주세요.' });
   }
 
   const {
@@ -86,8 +88,44 @@ async function endSession(req, res) {
 }
 
 async function getSessions(req, res) {
-  const sessions = await sessionRepo.findSessionsByUser(req.user.user_id);
-  res.json({ sessions });
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 20;
+  const { total, rows } = await sessionRepo.findSessionsByUser(req.user.user_id, page, limit);
+  res.json({
+    sessions: rows,
+    total,
+    page,
+    has_next: page * limit < total,
+  });
 }
 
-module.exports = { startSession, endSession, getSessions };
+async function getSessionById(req, res) {
+  const { id } = req.params;
+  const session = await sessionRepo.findSessionById(id);
+
+  if (!session) {
+    return res.status(404).json({ code: 'NOT_FOUND', message: '세션을 찾을 수 없습니다.' });
+  }
+  if (session.user_id !== req.user.user_id) {
+    return res.status(403).json({ code: 'FORBIDDEN', message: '접근 권한이 없습니다.' });
+  }
+
+  res.json({ session });
+}
+
+async function getSessionMessages(req, res) {
+  const { id } = req.params;
+  const session = await sessionRepo.findSessionById(id);
+
+  if (!session) {
+    return res.status(404).json({ code: 'NOT_FOUND', message: '세션을 찾을 수 없습니다.' });
+  }
+  if (session.user_id !== req.user.user_id) {
+    return res.status(403).json({ code: 'FORBIDDEN', message: '접근 권한이 없습니다.' });
+  }
+
+  const messages = await sessionRepo.findMessagesBySession(id);
+  res.json({ messages });
+}
+
+module.exports = { startSession, endSession, getSessions, getSessionById, getSessionMessages };

@@ -1,7 +1,7 @@
 /*
  * reportRepository - reports + session_analyses 테이블
- * - findDailyReports   : 오늘 날짜 리포트 목록 조회
- * - findMonthlyReports : 이번 달 리포트 목록 조회
+ * - findDailyReports   : 특정 날짜(기본 오늘) 리포트 목록 조회
+ * - findMonthlyReports : 특정 월(기본 이번달) 리포트 목록 조회
  */
 
 const pool = require('../config/db');
@@ -14,22 +14,32 @@ const BASE_SELECT = `
   JOIN session_analyses sa ON r.session_analysis_id = sa.session_analysis_id
   JOIN sessions s ON r.session_id = s.session_id`;
 
-async function findDailyReports(user_id) {
+async function findDailyReports(user_id, date) {
+  if (date) {
+    const [rows] = await pool.query(
+      `${BASE_SELECT} WHERE r.user_id = ? AND DATE(r.created_at) = ? ORDER BY r.created_at DESC`,
+      [user_id, date]
+    );
+    return rows;
+  }
   const [rows] = await pool.query(
-    `${BASE_SELECT}
-     WHERE r.user_id = ? AND DATE(r.created_at) = CURDATE()
-     ORDER BY r.created_at DESC`,
+    `${BASE_SELECT} WHERE r.user_id = ? AND DATE(r.created_at) = CURDATE() ORDER BY r.created_at DESC`,
     [user_id]
   );
   return rows;
 }
 
-async function findMonthlyReports(user_id) {
+async function findMonthlyReports(user_id, month) {
+  if (month) {
+    const [rows] = await pool.query(
+      `${BASE_SELECT} WHERE r.user_id = ? AND DATE_FORMAT(r.created_at, '%Y-%m') = ? ORDER BY r.created_at DESC`,
+      [user_id, month]
+    );
+    return rows;
+  }
   const [rows] = await pool.query(
     `${BASE_SELECT}
-     WHERE r.user_id = ?
-       AND YEAR(r.created_at) = YEAR(CURDATE())
-       AND MONTH(r.created_at) = MONTH(CURDATE())
+     WHERE r.user_id = ? AND YEAR(r.created_at) = YEAR(CURDATE()) AND MONTH(r.created_at) = MONTH(CURDATE())
      ORDER BY r.created_at DESC`,
     [user_id]
   );

@@ -1,7 +1,7 @@
 /*
  * chatController - 챗봇 대화
  * - chat : POST /api/chat  사용자 메시지 전송 및 AI 응답 생성
- *          1차: Node 키워드 감지 → 2차: FastAPI(LLM) 감지
+ *          고위험 감지는 FastAPI(LLM)가 전담 → is_risk: true 반환 시 처리
  *          고위험 감지 시 세션 종료 + risk_events 저장 + 프론트에 위험 응답 반환
  */
 
@@ -10,13 +10,6 @@ const pool = require('../config/db');
 const logAnalysisRepo = require('../repositories/logAnalysisRepository');
 const sessionRepo = require('../repositories/sessionRepository');
 const riskEventRepo = require('../repositories/riskEventRepository');
-
-// 1차 고위험 키워드 목록 — 다음 주에 팀원과 확정 후 채울 것
-const RISK_KEYWORDS = [];
-
-function detectRiskKeyword(message) {
-  return RISK_KEYWORDS.find(keyword => message.includes(keyword)) || null;
-}
 
 async function handleRisk({ user_id, session_id, matched_category, res }) {
   if (session_id) await sessionRepo.endSession(session_id);
@@ -27,15 +20,7 @@ async function handleRisk({ user_id, session_id, matched_category, res }) {
 async function chat(req, res) {
   const { session_id, message } = req.body;
   if (!message) {
-    return res.status(400).json({ message: 'message를 입력해주세요.' });
-  }
-
-  // 1차 고위험 키워드 감지
-  if (req.user && session_id) {
-    const matched = detectRiskKeyword(message);
-    if (matched) {
-      return handleRisk({ user_id: req.user.user_id, session_id, matched_category: matched, res });
-    }
+    return res.status(400).json({ code: 'INVALID_REQUEST', message: 'message를 입력해주세요.' });
   }
 
   let log_id = null;
@@ -43,7 +28,7 @@ async function chat(req, res) {
   // 회원인 경우에만 DB 저장
   if (req.user) {
     if (!session_id) {
-      return res.status(400).json({ message: 'session_id를 입력해주세요.' });
+      return res.status(400).json({ code: 'INVALID_REQUEST', message: 'session_id를 입력해주세요.' });
     }
 
     const [[{ turn_idx }]] = await pool.query(
@@ -67,10 +52,10 @@ async function chat(req, res) {
       { headers: { 'X-Internal-API-Key': process.env.INTERNAL_API_KEY } }
     );
   } catch {
-    return res.status(502).json({ message: 'AI 응답에 실패했습니다. 잠시 후 다시 시도해주세요.' });
+    return res.status(502).json({ code: 'BAD_GATEWAY', message: 'AI 응답에 실패했습니다. 잠시 후 다시 시도해주세요.' });
   }
 
-  // 2차 고위험 감지 — FastAPI(LLM)가 감지한 경우
+  // 고위험 감지 — FastAPI(LLM)가 감지한 경우
   if (req.user && session_id && fastapiRes.data.is_risk) {
     return handleRisk({
       user_id: req.user.user_id,

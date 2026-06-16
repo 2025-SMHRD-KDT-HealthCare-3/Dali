@@ -1,11 +1,12 @@
 /*
  * userRepository - users 테이블
  * - findByEmail        : 이메일로 사용자 조회
- * - findById           : user_id로 사용자 조회 (pwd 제외)
+ * - findById           : user_id로 사용자 조회 (pwd 제외, onboarding_completed 포함)
  * - findByProviderInfo : 소셜 로그인용 조회 (provider + sns_id)
  * - createUser         : 신규 사용자 생성
  * - updateUser         : 사용자 정보 수정 (nick_name, gender, birth_date)
  * - updatePersona      : 페르소나 업데이트
+ * - updatePassword     : 비밀번호 업데이트
  * - deleteUser         : 사용자 삭제
  */
 
@@ -18,7 +19,9 @@ async function findByEmail(email) {
 
 async function findById(userId) {
   const [rows] = await pool.query(
-    'SELECT user_id, email, nick_name, gender, birth_date, provider, persona, p_checked_at, created_at FROM users WHERE user_id = ?',
+    `SELECT user_id, email, nick_name, gender, birth_date, provider, persona, p_checked_at, created_at,
+            (persona IS NOT NULL) AS onboarding_completed
+     FROM users WHERE user_id = ?`,
     [userId]
   );
   return rows[0];
@@ -46,6 +49,10 @@ async function updatePersona(userId, persona) {
   );
 }
 
+async function updatePassword(userId, hashedPwd) {
+  await pool.query('UPDATE users SET pwd = ? WHERE user_id = ?', [hashedPwd, userId]);
+}
+
 async function deleteUser(userId) {
   await pool.query('DELETE FROM users WHERE user_id = ?', [userId]);
 }
@@ -58,4 +65,4 @@ async function findByProviderInfo(provider, snsId) {
   return rows[0];
 }
 
-module.exports = { findByEmail, findById, findByProviderInfo, createUser, updateUser, updatePersona, deleteUser };
+module.exports = { findByEmail, findById, findByProviderInfo, createUser, updateUser, updatePersona, updatePassword, deleteUser };
