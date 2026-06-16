@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import './splash.css'
 import moonImg from '../../assets/public/달.png'
 import { useTheme } from '../../contexts/ThemeContext'
+import ThemeToggle from '../Public/ThemeToggle'
 
 const ChatIcon = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -19,19 +20,12 @@ const LockIcon = () => (
 
 const Splash = () => {
   const navigate = useNavigate()
-  const { isDark, toggleTheme } = useTheme()
+  const { isDark } = useTheme()
 
   return (
     <div className="splash-screen">
 
-      {/* 테마 토글 */}
-      <button
-        className="splash-theme-toggle"
-        onClick={toggleTheme}
-        aria-label={isDark ? '라이트모드로 전환' : '다크모드로 전환'}
-      >
-        {isDark ? '☀️' : '🌙'}
-      </button>
+      <ThemeToggle className="splash-theme-toggle" />
 
       {/* 배경 장식 */}
       <div className="splash-bg" aria-hidden="true">

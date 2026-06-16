@@ -1,5 +1,8 @@
 import React, { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import './Signup.css'
+import { authApi } from '../../api/auth'
+import { setAccessToken } from '../../api/client'
 import googleImg from '../../assets/public/구글.png'
 import naverImg  from '../../assets/public/네이버.png'
 import kakaoImg  from '../../assets/public/카카오.png'
@@ -9,11 +12,7 @@ const UserIcon = () => (
     <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" />
   </svg>
 )
-const PhoneIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.15 11.93 19.79 19.79 0 0 1 1.08 3.3 2 2 0 0 1 3.07 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.09 8.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 21 16.92z" />
-  </svg>
-)
+
 const CalendarIcon = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
     <rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
@@ -47,24 +46,21 @@ const CheckIcon = () => (
 )
 
 const Signup = () => {
-  const [showPw, setShowPw]           = useState(false)
-  const [showConfirm, setShowConfirm] = useState(false)
+  const navigate = useNavigate()
+  const [showPw, setShowPw]             = useState(false)
+  const [showConfirm, setShowConfirm]   = useState(false)
   const [emailChecked, setEmailChecked] = useState(false)
-  const [agreed, setAgreed]           = useState(false)
+  const [agreed, setAgreed]             = useState(false)
   const [form, setForm] = useState({
-    name: '', phone: '', birthDay: '', birthMonth: '', birthYear: '',
+    nickname: '', birthDay: '', birthMonth: '', birthYear: '',
     gender: '', email: '', password: '', confirm: '',
   })
   const [errors, setErrors] = useState({})
+  const [loading, setLoading] = useState(false)
 
   const handleChange = (e) => {
     const { name, value } = e.target
     let v = value
-    if (name === 'phone') {
-      const d = value.replace(/\D/g, '').slice(0, 11)
-      v = d.length > 7 ? `${d.slice(0,3)}-${d.slice(3,7)}-${d.slice(7)}`
-        : d.length > 3 ? `${d.slice(0,3)}-${d.slice(3)}` : d
-    }
     if (name === 'birthDay')   v = value.replace(/\D/g, '').slice(0, 2)
     if (name === 'birthMonth') v = value.replace(/\D/g, '').slice(0, 2)
     if (name === 'birthYear')  v = value.replace(/\D/g, '').slice(0, 4)
@@ -73,57 +69,74 @@ const Signup = () => {
     setErrors(err => ({ ...err, [name]: '' }))
   }
 
-  const handleEmailCheck = () => {
+  const handleEmailCheck = async () => {
     if (!form.email || !/\S+@\S+\.\S+/.test(form.email)) {
       setErrors(err => ({ ...err, email: '올바른 이메일을 입력해주세요.' }))
       return
     }
-    setEmailChecked(true)
-    setErrors(err => ({ ...err, email: '' }))
-    // TODO: API 중복 확인
+    try {
+      const res = await authApi.checkEmail(form.email)
+      if (res.is_duplicate) {
+        setErrors(err => ({ ...err, email: '이미 사용중인 이메일입니다.' }))
+      } else {
+        setEmailChecked(true)
+        setErrors(err => ({ ...err, email: '' }))
+      }
+    } catch {
+      setErrors(err => ({ ...err, email: '중복 확인 중 오류가 발생했습니다.' }))
+    }
   }
 
   const validate = () => {
     const e = {}
-    if (!form.name)                                    e.name     = '성명을 입력해주세요.'
-    if (!form.phone)                                   e.phone    = '전화번호를 입력해주세요.'
-    if (!form.birthDay || !form.birthMonth || !form.birthYear) e.birth = '생년월일을 입력해주세요.'
-    if (!form.gender)                                  e.gender   = '성별을 선택해주세요.'
-    if (!form.email || !/\S+@\S+\.\S+/.test(form.email)) e.email = '올바른 이메일을 입력해주세요.'
-    else if (!emailChecked)                            e.email    = '이메일 중복확인을 해주세요.'
-    if (form.password.length < 8)                      e.password = '비밀번호는 8자 이상이어야 합니다.'
-    if (form.password !== form.confirm)                e.confirm  = '비밀번호가 일치하지 않습니다.'
-    if (!agreed)                                       e.agreed   = '이용약관에 동의해주세요.'
+    if (!form.nickname)                                        e.nickname = '닉네임을 입력해주세요.'
+    if (!form.birthDay || !form.birthMonth || !form.birthYear) e.birth    = '생년월일을 입력해주세요.'
+    if (!form.gender)                                          e.gender   = '성별을 선택해주세요.'
+    if (!form.email || !/\S+@\S+\.\S+/.test(form.email))      e.email    = '올바른 이메일을 입력해주세요.'
+    else if (!emailChecked)                                    e.email    = '이메일 중복확인을 해주세요.'
+    if (form.password.length < 8)                              e.password = '비밀번호는 8자 이상이어야 합니다.'
+    if (form.password !== form.confirm)                        e.confirm  = '비밀번호가 일치하지 않습니다.'
+    if (!agreed)                                               e.agreed   = '이용약관에 동의해주세요.'
     return e
   }
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
     const errs = validate()
     if (Object.keys(errs).length > 0) { setErrors(errs); return }
-    // TODO: API 연동
+
+    const birth_date = `${form.birthYear}-${form.birthMonth.padStart(2, '0')}-${form.birthDay.padStart(2, '0')}`
+
+    setLoading(true)
+    try {
+      const res = await authApi.signup({
+        email: form.email,
+        pwd: form.password,
+        nick_name: form.nickname,
+        gender: form.gender,
+        birth_date,
+        terms_agreed: true,
+      })
+      if (res.access_token) setAccessToken(res.access_token)
+      navigate('/onboarding')
+    } catch (err) {
+      setErrors(e => ({ ...e, submit: err.message || '회원가입에 실패했습니다.' }))
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
     <form className="auth-form" onSubmit={handleSubmit}>
 
-      {/* 성명 */}
+      {/* 닉네임 */}
       <div className="input-row">
         <span className="input-icon"><UserIcon /></span>
-        <input type="text" name="name" className="field-input"
-          placeholder="성명을 입력하세요"
-          value={form.name} onChange={handleChange} autoComplete="name" />
+        <input type="text" name="nickname" className="field-input"
+          placeholder="닉네임을 입력하세요"
+          value={form.nickname} onChange={handleChange} autoComplete="nickname" />
       </div>
-      {errors.name && <p className="form-error">{errors.name}</p>}
-
-      {/* 전화번호 */}
-      <div className="input-row">
-        <span className="input-icon"><PhoneIcon /></span>
-        <input type="tel" name="phone" className="field-input"
-          placeholder="010-0000-0000"
-          value={form.phone} onChange={handleChange} autoComplete="tel" />
-      </div>
-      {errors.phone && <p className="form-error">{errors.phone}</p>}
+      {errors.nickname && <p className="form-error">{errors.nickname}</p>}
 
       {/* 생년월일 */}
       <div className="field-group-label">
@@ -213,11 +226,12 @@ const Signup = () => {
         </span>
       </label>
       {errors.agreed && <p className="form-error">{errors.agreed}</p>}
+      {errors.submit && <p className="form-error">{errors.submit}</p>}
 
       {/* 회원가입 버튼 */}
-      <button type="submit" className="btn-cta">
+      <button type="submit" className="btn-cta" disabled={loading}>
         <span className="sparkle">✦</span>
-        회원가입
+        {loading ? '가입 중...' : '회원가입'}
         <span className="sparkle">✦</span>
       </button>
 
