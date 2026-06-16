@@ -1,6 +1,8 @@
 /*
  * summaryRepository - summaries 테이블
- * - createSummary : 대화 요약 저장 (LLM 맥락 참고용 — FastAPI에서 직접 DB 조회)
+ * - createSummary        : 대화 요약 저장
+ * - findSummariesByUser  : 사용자의 전체 요약 목록 조회 (페이지네이션)
+ * - findSummaryById      : 요약 단건 조회
  */
 
 const pool = require('../config/db');
@@ -13,4 +15,22 @@ async function createSummary({ user_id, session_id, context_summary }) {
   return result.insertId;
 }
 
-module.exports = { createSummary };
+async function findSummariesByUser(user_id, page = 1, limit = 20) {
+  const offset = (page - 1) * limit;
+  const [[{ total }]] = await pool.query(
+    'SELECT COUNT(*) AS total FROM summaries WHERE user_id = ?',
+    [user_id]
+  );
+  const [rows] = await pool.query(
+    'SELECT summary_id, session_id, created_at FROM summaries WHERE user_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?',
+    [user_id, limit, offset]
+  );
+  return { total, rows };
+}
+
+async function findSummaryById(summary_id) {
+  const [rows] = await pool.query('SELECT * FROM summaries WHERE summary_id = ?', [summary_id]);
+  return rows[0];
+}
+
+module.exports = { createSummary, findSummariesByUser, findSummaryById };

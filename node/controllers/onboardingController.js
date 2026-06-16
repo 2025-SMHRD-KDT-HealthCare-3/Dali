@@ -24,7 +24,6 @@ function calculatePersona(q1Answer, q2Answer, q4Answer) {
   const maxScore = Math.max(...Object.values(scores));
   const topPersonas = Object.keys(scores).filter(p => scores[p] === maxScore);
 
-  // 동점 시 Q4(가중치 최고) 기준으로 결정
   if (topPersonas.length > 1) {
     const q4Persona = Q4_MAP[q4Answer];
     if (topPersonas.includes(q4Persona)) return q4Persona;
@@ -37,7 +36,7 @@ async function saveOnboarding(req, res) {
   const { question_no, question, exp_1, exp_2, exp_3, exp_4, exp_5, user_answer } = req.body;
 
   if (!question_no || !question || !exp_1 || !exp_2 || !exp_3 || !exp_4 || user_answer == null) {
-    return res.status(400).json({ message: '필수 항목이 누락되었습니다.' });
+    return res.status(400).json({ code: 'INVALID_REQUEST', message: '필수 항목이 누락되었습니다.' });
   }
 
   // 비회원은 DB 저장 없이 Q4면 페르소나 추천만 반환
@@ -66,7 +65,7 @@ async function saveOnboarding(req, res) {
         { headers: { 'X-Internal-API-Key': process.env.INTERNAL_API_KEY } }
       );
     } catch {
-      return res.status(502).json({ message: '컨텍스트 전달에 실패했습니다. 다시 시도해주세요.' });
+      return res.status(502).json({ code: 'BAD_GATEWAY', message: '컨텍스트 전달에 실패했습니다. 다시 시도해주세요.' });
     }
   }
 

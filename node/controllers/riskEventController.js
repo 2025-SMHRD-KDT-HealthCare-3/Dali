@@ -12,9 +12,9 @@ async function getRiskEvents(req, res) {
 
   if (session_id) {
     const session = await sessionRepo.findSessionById(session_id);
-    if (!session) return res.status(404).json({ message: '세션을 찾을 수 없습니다.' });
+    if (!session) return res.status(404).json({ code: 'NOT_FOUND', message: '세션을 찾을 수 없습니다.' });
     if (session.user_id !== req.user.user_id) {
-      return res.status(403).json({ message: '접근 권한이 없습니다.' });
+      return res.status(403).json({ code: 'FORBIDDEN', message: '접근 권한이 없습니다.' });
     }
     const events = await riskEventRepo.findBySessionId(session_id, req.user.user_id);
     return res.json({ risk_events: events });
