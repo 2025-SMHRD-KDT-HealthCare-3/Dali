@@ -35,11 +35,18 @@ async function createUser({ email, pwd = null, nick_name, gender, birth_date, pr
   return result.insertId;
 }
 
+// 전달된 필드만 업데이트 (undefined인 필드는 제외)
 async function updateUser(userId, { nick_name, gender, birth_date }) {
-  await pool.query(
-    'UPDATE users SET nick_name = ?, gender = ?, birth_date = ? WHERE user_id = ?',
-    [nick_name, gender, birth_date, userId]
-  );
+  const fields = [];
+  const values = [];
+
+  if (nick_name !== undefined) { fields.push('nick_name = ?'); values.push(nick_name); }
+  if (gender !== undefined)    { fields.push('gender = ?');    values.push(gender); }
+  if (birth_date !== undefined){ fields.push('birth_date = ?');values.push(birth_date); }
+
+  if (fields.length === 0) return;
+  values.push(userId);
+  await pool.query(`UPDATE users SET ${fields.join(', ')} WHERE user_id = ?`, values);
 }
 
 async function updatePersona(userId, persona) {

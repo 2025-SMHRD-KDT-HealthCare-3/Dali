@@ -2,6 +2,7 @@
  * riskEventRepository - risk_events 테이블
  * - findByUserId    : 사용자의 전체 고위험 신호 목록 조회
  * - findBySessionId : 특정 세션의 고위험 신호 목록 조회
+ * - countByUserId   : 사용자의 전체 고위험 신호 누적 횟수 조회
  * - createRiskEvent : 고위험 신호 저장
  */
 
@@ -23,6 +24,14 @@ async function findBySessionId(session_id, user_id) {
   return rows;
 }
 
+async function countByUserId(user_id) {
+  const [[{ cnt }]] = await pool.query(
+    'SELECT COUNT(*) AS cnt FROM risk_events WHERE user_id = ?',
+    [user_id]
+  );
+  return cnt;
+}
+
 async function createRiskEvent({ user_id, session_id, matched_category, action_taken }) {
   const [result] = await pool.query(
     'INSERT INTO risk_events (user_id, session_id, matched_category, action_taken) VALUES (?, ?, ?, ?)',
@@ -31,4 +40,4 @@ async function createRiskEvent({ user_id, session_id, matched_category, action_t
   return result.insertId;
 }
 
-module.exports = { findByUserId, findBySessionId, createRiskEvent };
+module.exports = { findByUserId, findBySessionId, countByUserId, createRiskEvent };
