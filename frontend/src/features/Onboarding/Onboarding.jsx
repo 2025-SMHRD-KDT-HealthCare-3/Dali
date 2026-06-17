@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import './onboarding.css'
 import chatBgDark  from '../../assets/dark/챗봇 배경.png'
 import chatBgLight from '../../assets/light/챗봇 배경 라이트.png'
@@ -82,7 +82,7 @@ const QUESTIONS = [
     key: 'coachingStyle',
     conditional: false,
     question_no: 4,
-    text: '달리와 어떤 시간을 보내고 싶나요?',
+    text: '달리와 어떤 시간을 보내고 싶나요?\n추천을 그대로 하셔도 되고, 원하는 스타일로 바꾸셔도 돼요 😊',
     type: 'quickreply',
     options: [
       '친구처럼 편하게 이야기하고 싶어요',
@@ -103,6 +103,22 @@ const Q4_TO_PERSONA = {
 
 const PERSONA_EMOJI = { '공감형': '🩷', '친구형': '✨', '분석형': '🌿', '동기부여형': '🌙' }
 
+// Q1 감정 답변 → 예비 추천 페르소나 (Q4 전 표시용)
+const EMOTION_TO_PERSONA = {
+  '생각이 많고 복잡해요':    '분석형',
+  '마음이 조금 지쳐있어요':  '공감형',
+  '아무것도 하기 싫어요':    '동기부여형',
+  '편하게 이야기하고 싶어요': '친구형',
+}
+
+// 페르소나 → Q4 옵션 텍스트 (추천 칩 강조용)
+const PERSONA_TO_Q4_OPT = {
+  '친구형':     '친구처럼 편하게 이야기하고 싶어요',
+  '분석형':     '복잡한 마음을 정리하고 싶어요',
+  '동기부여형': '작은 것부터 다시 시작하고 싶어요',
+  '공감형':     '따뜻한 위로를 받고 싶어요',
+}
+
 const GREETING = '안녕하세요! 저는 달리예요 🌙\n처음 만나서 반가워요! 잠깐 몇 가지 여쭤봐도 될까요?'
 
 const nowStr = () => {
@@ -122,16 +138,25 @@ const SendIcon = () => (
 /* ── 컴포넌트 ── */
 const Onboarding = ({ registerToken = null }) => {
   const navigate   = useNavigate()
+  const location   = useLocation()
   const { isDark } = useTheme()
   const { isAuthenticated, user, setUser } = useAuth()
   const bottomRef  = useRef(null)
 
-  // 이미 온보딩 완료한 회원은 메인으로 리다이렉트
+  // Chat에서 리다이렉트될 때 감정 ID 보존
+  const returnEmotion = location.state?.returnEmotion || null
+
+  // 이미 온보딩 완료한 회원은 리다이렉트 (제출 중에는 스킵)
+  const [phase, setPhase] = useState('typing')
+
   useEffect(() => {
-    if (isAuthenticated && user?.onboarding_completed) {
-      navigate('/main', { replace: true })
+    if (isAuthenticated && user?.onboarding_completed && phase !== 'submitting') {
+      navigate(returnEmotion ? '/chat' : '/main', {
+        replace: true,
+        state: returnEmotion ? { emotion: returnEmotion } : undefined,
+      })
     }
-  }, [isAuthenticated, user?.onboarding_completed])
+  }, [isAuthenticated, user?.onboarding_completed, phase])
 
   // 회원의 기존 프로필 또는 비회원 sessionStorage에서 prefill 계산 → conditional 질문 스킵
   const prefill = useMemo(() => {
@@ -164,12 +189,12 @@ const Onboarding = ({ registerToken = null }) => {
     [prefill]
   )
 
-  const [messages,   setMessages]  = useState([])
-  const [isTyping,   setIsTyping]  = useState(true)
-  const [step,       setStep]      = useState(-1)
-  const [answers,    setAnswers]   = useState({})
-  const [phase,      setPhase]     = useState('typing')  // 'typing' | 'waiting' | 'submitting'
-  const [inputValue, setInputValue] = useState('')
+  const [messages,      setMessages]     = useState([])
+  const [isTyping,      setIsTyping]     = useState(true)
+  const [step,          setStep]         = useState(-1)
+  const [answers,       setAnswers]      = useState({})
+  const [inputValue,    setInputValue]   = useState('')
+  const [recommendedOpt, setRecommendedOpt] = useState(null)
 
   const addDali = (text) =>
     setMessages(prev => [...prev, { id: Date.now() + Math.random(), role: 'dali', text, time: nowStr() }])
@@ -215,6 +240,7 @@ const Onboarding = ({ registerToken = null }) => {
 
     const nextStep = step + 1
     if (nextStep >= activeQuestions.length) {
+      // Q4 (마지막) 답변 완료 → 저장 + 최종 메시지
       setTimeout(() => {
         addDali('고마워요! 이제 달리와 함께할 준비가 됐어요 ✨')
         setIsTyping(false)
@@ -222,7 +248,23 @@ const Onboarding = ({ registerToken = null }) => {
         submitAll(newAnswers)
       }, 1200)
     } else {
-      setTimeout(() => setStep(nextStep), 1200)
+      const nextQ = activeQuestions[nextStep]
+      if (nextQ?.key === 'coachingStyle') {
+        // Q3 → Q4 직전: Q1 기반 예비 추천 페르소나 먼저 안내
+        const preRecommended = EMOTION_TO_PERSONA[newAnswers.emotion] || '공감형'
+        const preEmoji = PERSONA_EMOJI[preRecommended] || '✨'
+        setRecommendedOpt(PERSONA_TO_Q4_OPT[preRecommended] || null)
+        setTimeout(() => {
+          addDali(`달리가 분석해보니,\n${preEmoji} ${preRecommended} 스타일이 잘 맞을 것 같아요!\n아래에서 원하시는 스타일을 직접 골라보실 수 있어요 🌙`)
+          setIsTyping(false)
+          setTimeout(() => {
+            setIsTyping(true)
+            setTimeout(() => setStep(nextStep), 1200)
+          }, 1500)
+        }, 1200)
+      } else {
+        setTimeout(() => setStep(nextStep), 1200)
+      }
     }
   }
 
@@ -251,46 +293,25 @@ const Onboarding = ({ registerToken = null }) => {
       }))
     }
 
-    // 2. Q1~Q3 저장 (question_no 1~3)
-    const q1to3 = QUESTIONS.filter(q => !q.conditional && q.question_no && q.question_no <= 3)
-    for (const qDef of q1to3) {
-      const textAnswer = allAnswers[qDef.key]
-      if (!textAnswer) continue
-      const optionIdx = qDef.options.indexOf(textAnswer) + 1
-      if (optionIdx === 0) continue
-      try {
-        await onboardingApi.saveAnswer({
-          question_no: qDef.question_no,
-          question:    qDef.text,
-          exp_1: qDef.options[0], exp_2: qDef.options[1],
-          exp_3: qDef.options[2], exp_4: qDef.options[3],
-          exp_5: qDef.options[4] || null,
-          user_answer: optionIdx,
-        })
-      } catch (err) {
-        console.error(`[onboarding] Q${qDef.question_no} 저장 실패:`, err)
-      }
+    // 2. Q1~Q4 한 번에 저장 → recommended_persona 반환
+    const qDefs = {
+      1: QUESTIONS.find(q => q.question_no === 1),
+      2: QUESTIONS.find(q => q.question_no === 2),
+      3: QUESTIONS.find(q => q.question_no === 3),
+      4: QUESTIONS.find(q => q.question_no === 4),
     }
+    const q1 = qDefs[1] ? qDefs[1].options.indexOf(allAnswers.emotion)       + 1 : 0
+    const q2 = qDefs[2] ? qDefs[2].options.indexOf(allAnswers.energy)        + 1 : 0
+    const q3 = qDefs[3] ? qDefs[3].options.indexOf(allAnswers.topic)         + 1 : 0
+    const q4 = qDefs[4] ? qDefs[4].options.indexOf(allAnswers.coachingStyle) + 1 : 0
 
-    // 3. Q4 저장 — 응답에서 recommended_persona 캡처
-    const q4Def = QUESTIONS.find(q => q.question_no === 4)
     let recommended = null
-    if (q4Def && allAnswers[q4Def.key]) {
-      const optionIdx = q4Def.options.indexOf(allAnswers[q4Def.key]) + 1
-      if (optionIdx > 0) {
-        try {
-          const res = await onboardingApi.saveAnswer({
-            question_no: q4Def.question_no,
-            question:    q4Def.text,
-            exp_1: q4Def.options[0], exp_2: q4Def.options[1],
-            exp_3: q4Def.options[2], exp_4: q4Def.options[3],
-            exp_5: null,
-            user_answer: optionIdx,
-          })
-          recommended = res?.recommended_persona || null
-        } catch (err) {
-          console.error('[onboarding] Q4 저장 실패:', err)
-        }
+    if (q1 && q2 && q3 && q4) {
+      try {
+        const res = await onboardingApi.saveAll({ q1, q2, q3, q4 })
+        recommended = res?.recommended_persona || null
+      } catch (err) {
+        console.error('[onboarding] saveAll 실패:', err)
       }
     }
 
@@ -313,7 +334,11 @@ const Onboarding = ({ registerToken = null }) => {
             console.error('[onboarding] updatePersona failed:', err)
           )
         }
-        navigate('/main')
+        if (returnEmotion) {
+          navigate('/chat', { state: { emotion: returnEmotion } })
+        } else {
+          navigate('/main')
+        }
       }, 2000)
     }, 800)
   }
@@ -356,8 +381,13 @@ const Onboarding = ({ registerToken = null }) => {
           {currentQ.type === 'quickreply' && (
             <div className="ob-chips">
               {currentQ.options.map(opt => (
-                <button key={opt} className="ob-chip" onClick={() => handleAnswer(opt)}>
+                <button
+                  key={opt}
+                  className={`ob-chip${opt === recommendedOpt ? ' ob-chip--recommended' : ''}`}
+                  onClick={() => handleAnswer(opt)}
+                >
                   {opt}
+                  {opt === recommendedOpt && <span className="ob-chip-badge">추천</span>}
                 </button>
               ))}
             </div>

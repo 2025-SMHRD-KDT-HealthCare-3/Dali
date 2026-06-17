@@ -1,4 +1,5 @@
-import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
+import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
+import { useEffect } from 'react'
 import './App.css'
 import { useAuth } from './contexts/AuthContext'
 import Leftpanel  from './features/Public/Leftpanel'
@@ -32,9 +33,19 @@ function PublicOnlyRoute({ children }) {
 }
 
 function App() {
-  const { pathname } = useLocation()
-  const { authLoading } = useAuth()
+  const { pathname, search } = useLocation()
+  const navigate = useNavigate()
+  const { isAuthenticated, authLoading } = useAuth()
   const showFooter = FOOTER_PATHS.includes(pathname)
+
+  // 소셜 로그인(네이버/카카오) 콜백 후 백엔드가 /chat?isOnboarding=true 로 리다이렉트 할 때 처리
+  useEffect(() => {
+    if (authLoading) return
+    const params = new URLSearchParams(search)
+    if (params.get('isOnboarding') === 'true' && isAuthenticated) {
+      navigate('/onboarding', { replace: true })
+    }
+  }, [authLoading, isAuthenticated])
 
   if (authLoading) {
     return (

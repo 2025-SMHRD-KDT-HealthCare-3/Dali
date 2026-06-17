@@ -27,12 +27,8 @@ const TOPIC_OPTS = [
   '특별한 고민은 없어요',
 ]
 
-const COACHING_OPTS = [
-  '친구처럼 편하게 이야기하고 싶어요',
-  '복잡한 마음을 정리하고 싶어요',
-  '작은 것부터 다시 시작하고 싶어요',
-  '따뜻한 위로를 받고 싶어요',
-]
+// 페르소나 → Q4 인덱스 (saveAll에서 q4 계산용)
+const PERSONA_TO_Q4 = { '친구형': 1, '분석형': 2, '동기부여형': 3, '공감형': 4 }
 
 const EMOTION_STATE_OPTS = [
   '생각이 많고 복잡해요',
@@ -49,13 +45,6 @@ const PERSONAS = [
   { id: '동기부여형', emoji: '🌙', name: '동기부여 코치', desc: '작은 것부터 다시 시작하도록 도와드려요' },
 ]
 
-// 온보딩 질문 정의 (백엔드 전송용)
-const OB_DEFS = [
-  { question_no: 1, question: '요즘 당신의 마음은 어떤가요?',             key: 'emotionState',  opts: EMOTION_STATE_OPTS },
-  { question_no: 2, question: '요즘 하루 에너지 수준은 어떤가요?',         key: 'energy',        opts: ENERGY_OPTS },
-  { question_no: 3, question: '최근 가장 신경 쓰이는 영역은 무엇인가요?',  key: 'topic',         opts: TOPIC_OPTS },
-  { question_no: 4, question: '달리와 어떤 시간을 보내고 싶나요?',         key: 'coachingStyle', opts: COACHING_OPTS },
-]
 
 const EyeIcon = ({ show }) => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -93,10 +82,9 @@ const Info = () => {
   const [pwMsg,     setPwMsg]     = useState('')
 
   // 온보딩 정보
-  const [emotionState,  setEmotionState]  = useState('')
-  const [energy,        setEnergy]        = useState('')
-  const [topic,         setTopic]         = useState('')
-  const [coachingStyle, setCoachingStyle] = useState('')
+  const [emotionState, setEmotionState] = useState('')
+  const [energy,       setEnergy]       = useState('')
+  const [topic,        setTopic]        = useState('')
 
   // 페르소나
   const [persona, setPersona] = useState('')
@@ -129,7 +117,6 @@ const Info = () => {
           if (question_no === 1 && EMOTION_STATE_OPTS[idx]) setEmotionState(EMOTION_STATE_OPTS[idx])
           if (question_no === 2 && ENERGY_OPTS[idx])        setEnergy(ENERGY_OPTS[idx])
           if (question_no === 3 && TOPIC_OPTS[idx])         setTopic(TOPIC_OPTS[idx])
-          if (question_no === 4 && COACHING_OPTS[idx])      setCoachingStyle(COACHING_OPTS[idx])
         })
       } catch {}
 
@@ -161,34 +148,21 @@ const Info = () => {
         await userApi.updatePersona(persona)
       }
 
-      // 온보딩 답변 저장 (백엔드 B-3 upsert 구현 후 정상 동작)
-      const obValues = { emotionState, energy, topic, coachingStyle }
-      for (const def of OB_DEFS) {
-        const val = obValues[def.key]
-        if (!val) continue
-        const optionIdx = def.opts.indexOf(val) + 1
-        if (!optionIdx) continue
-        try {
-          await onboardingApi.saveAnswer({
-            question_no: def.question_no,
-            question:    def.question,
-            exp_1: def.opts[0],
-            exp_2: def.opts[1],
-            exp_3: def.opts[2],
-            exp_4: def.opts[3],
-            exp_5: def.opts[4] || null,
-            user_answer: optionIdx,
-          })
-        } catch {}
+      // 온보딩 답변 저장 — q4는 페르소나 선택에서 역산
+      const q1 = emotionState ? EMOTION_STATE_OPTS.indexOf(emotionState) + 1 : 0
+      const q2 = energy       ? ENERGY_OPTS.indexOf(energy)              + 1 : 0
+      const q3 = topic        ? TOPIC_OPTS.indexOf(topic)                + 1 : 0
+      const q4 = PERSONA_TO_Q4[persona] || 0
+      if (q1 && q2 && q3 && q4) {
+        try { await onboardingApi.saveAll({ q1, q2, q3, q4 }) } catch {}
       }
 
-      // AuthContext user 동기화
       setUser(prev => ({
         ...prev,
-        nick_name:  nickname  || prev?.nick_name,
-        gender:     genderVal || prev?.gender,
+        nick_name:  nickname   || prev?.nick_name,
+        gender:     genderVal  || prev?.gender,
         birth_date: cleanBirth || prev?.birth_date,
-        persona:    persona   || prev?.persona,
+        persona:    persona    || prev?.persona,
       }))
 
       setSuccess('저장되었습니다.')
@@ -344,15 +318,6 @@ const Info = () => {
             </div>
           </div>
 
-          <div className="info-field">
-            <label className="info-label">달리와 보내고 싶은 시간</label>
-            <div className="info-chips info-chips--col">
-              {COACHING_OPTS.map(opt => (
-                <button key={opt} className={`info-chip${coachingStyle === opt ? ' active' : ''}`} onClick={() => setCoachingStyle(opt)}>{opt}</button>
-              ))}
-            </div>
-          </div>
-
         </section>
 
         {/* ── 달리 페르소나 ── */}
@@ -386,22 +351,20 @@ const Info = () => {
           {saving ? '저장 중...' : '저장하기'}
         </button>
 
-        {/* ── 로그아웃 ── */}
-        <section className="info-section info-section--withdraw">
-          <button
-            className="info-logout-btn"
-            onClick={async () => { await logout(); navigate('/') }}
-          >
-            로그아웃
-          </button>
-        </section>
-
-        {/* ── 회원탈퇴 ── */}
+        {/* ── 로그아웃 + 회원탈퇴 ── */}
         <section className="info-section info-section--withdraw">
           {!showWithdrawConfirm ? (
-            <button className="info-withdraw-btn" onClick={() => setShowWithdrawConfirm(true)}>
-              회원탈퇴
-            </button>
+            <div className="info-account-actions">
+              <button
+                className="info-logout-btn"
+                onClick={async () => { await logout(); navigate('/') }}
+              >
+                로그아웃
+              </button>
+              <button className="info-withdraw-btn" onClick={() => setShowWithdrawConfirm(true)}>
+                회원탈퇴
+              </button>
+            </div>
           ) : (
             <div className="info-withdraw-confirm">
               <p className="info-withdraw-msg">정말 탈퇴하시겠어요? 모든 데이터가 삭제되며 복구할 수 없습니다.</p>

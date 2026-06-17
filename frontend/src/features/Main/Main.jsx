@@ -1,8 +1,9 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import './main.css'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
+import { userApi } from '../../api/user'
 import ThemeToggle  from '../Public/ThemeToggle'
 
 import logoDarkImg  from '../../assets/dark/달리로고.png'
@@ -28,7 +29,16 @@ const Main = () => {
   const navigate = useNavigate()
   const [selected, setSelected] = useState(null)
   const { isDark } = useTheme()
-  const { isAuthenticated, user } = useAuth()
+  const { isAuthenticated, user, setUser } = useAuth()
+
+  // 진입 시 최신 사용자 상태 갱신 (onboarding_completed 등 stale 방지)
+  useEffect(() => {
+    if (isAuthenticated) {
+      userApi.getMe()
+        .then(res => { if (res.user) setUser(res.user) })
+        .catch(() => {})
+    }
+  }, [isAuthenticated])
 
   return (
     <div className="main-screen">
@@ -126,12 +136,12 @@ const Main = () => {
         <div className="main-actions">
           <button
             className={`main-btn-next${!selected ? ' is-disabled' : ''}`}
-            onClick={() => selected && navigate('/chat', { state: { isOnboarding: !user?.onboarding_completed, emotion: selected } })}
+            onClick={() => selected && navigate('/chat', { state: { emotion: selected } })}
           >
             {selected ? '다음' : '감정을 선택해주세요'} <span className="btn-arrow">›</span>
           </button>
           <div className="main-footer-links">
-            <button className="main-skip" onClick={() => navigate('/chat', { state: { isOnboarding: !user?.onboarding_completed, emotion: 'anxiety' } })}>잘 모르겠어요</button>
+            <button className="main-skip" onClick={() => navigate('/chat', { state: { emotion: 'anxiety' } })}>잘 모르겠어요</button>
           </div>
         </div>
 

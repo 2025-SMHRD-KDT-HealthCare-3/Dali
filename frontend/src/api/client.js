@@ -1,6 +1,6 @@
 // 공통 fetch 래퍼 — 토큰 관리, 401 자동 재시도, ApiError 정의
 
-const BASE_URL = `${import.meta.env.VITE_API_URL}/api`
+const BASE_URL = `${import.meta.env.VITE_API_URL || ''}/api`
 
 /* ── 액세스 토큰 (메모리 보관, 새로고침 시 초기화) ── */
 let _accessToken = null

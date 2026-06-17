@@ -73,7 +73,8 @@ const Mission = () => {
     }
   }
 
-  const behaviorMissions = missions.filter(m => m.mission_seq <= 3)
+  const today = new Date().toISOString().slice(0, 10)
+  const behaviorMissions = missions.filter(m => m.mission_date?.slice(0, 10) === today && m.mission_seq <= 3)
   const behaviorDone     = behaviorMissions.filter(m => m.is_completed === 'Y').length
   const behaviorTotal    = behaviorMissions.length
   const plImgs           = isDark ? [pl1Dark, pl2Dark] : [pl1Light, pl2Light]
