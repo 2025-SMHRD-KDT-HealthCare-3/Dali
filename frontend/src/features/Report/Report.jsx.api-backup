@@ -1,0 +1,406 @@
+import React, { useState, useMemo, useEffect, useCallback } from 'react'
+import ThemeToggle from '../Public/ThemeToggle'
+import { useTheme } from '../../contexts/ThemeContext'
+import './report.css'
+import { reportApi } from '../../api/reports'
+import { emotionAlertApi } from '../../api/emotionAlerts'
+
+const EMOTIONS = {
+  '행복': { color: '#5BC479', bg: 'rgba(91,196,121,0.18)',   emoji: '😊' },
+  '평온': { color: '#9B7EFF', bg: 'rgba(155,126,255,0.18)',  emoji: '😌' },
+  '불안': { color: '#E8A87C', bg: 'rgba(232,168,124,0.18)',  emoji: '😰' },
+  '슬픔': { color: '#7BCCE8', bg: 'rgba(123,204,232,0.18)',  emoji: '😢' },
+  '화남': { color: '#E85C5C', bg: 'rgba(232,92,92,0.18)',    emoji: '😠' },
+  '피곤': { color: '#A0A0B8', bg: 'rgba(160,160,184,0.18)',  emoji: '😴' },
+  '설렘': { color: '#F6C85B', bg: 'rgba(246,200,91,0.18)',   emoji: '🤩' },
+  '기쁨': { color: '#5BC479', bg: 'rgba(91,196,121,0.18)',   emoji: '😊' },
+  '분노': { color: '#E85C5C', bg: 'rgba(232,92,92,0.18)',    emoji: '😠' },
+  '당황': { color: '#F6C85B', bg: 'rgba(246,200,91,0.18)',   emoji: '😳' },
+  '상처': { color: '#A0A0B8', bg: 'rgba(160,160,184,0.18)',  emoji: '🥺' },
+}
+
+// 6개 감정 점수 → {label, pct}[] 변환
+function toRatios(report) {
+  const raw = [
+    { label: '행복', val: report.joy_score       || 0 },
+    { label: '슬픔', val: report.sad_score        || 0 },
+    { label: '불안', val: report.anxiety_score    || 0 },
+    { label: '분노', val: report.anger_score      || 0 },
+    { label: '상처', val: report.hurt_score       || 0 },
+    { label: '당황', val: report.embarrass_score  || 0 },
+  ].filter(e => e.val > 0)
+  const total = raw.reduce((s, e) => s + e.val, 0) || 1
+  return raw.map(e => ({ label: e.label, pct: Math.round(e.val / total * 100) }))
+         .sort((a, b) => b.pct - a.pct)
+}
+
+const formatDate = (d) => {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+const formatMonth = (d) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+
+const timeLabel = (isoStr) => {
+  const d = new Date(isoStr)
+  const hh = d.getHours()
+  const mm = String(d.getMinutes()).padStart(2, '0')
+  return `${hh < 12 ? '오전' : '오후'} ${hh % 12 || 12}:${mm}`
+}
+
+const TODAY = new Date()
+const DAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
+
+const ChevLeft  = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M15 18l-6-6 6-6"/>
+  </svg>
+)
+const ChevRight = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M9 18l6-6-6-6"/>
+  </svg>
+)
+
+const Report = () => {
+  const { isDark } = useTheme()
+  const [activeTab,    setActiveTab]    = useState('daily')
+  const [currentDate,  setCurrentDate]  = useState(new Date())
+  const [currentMonth, setCurrentMonth] = useState(new Date(TODAY.getFullYear(), TODAY.getMonth(), 1))
+
+  const [dailyReports,   setDailyReports]   = useState([])
+  const [monthlyReports, setMonthlyReports] = useState([])
+  const [alerts,         setAlerts]         = useState([])
+  const [dailyLoading,   setDailyLoading]   = useState(false)
+  const [monthlyLoading, setMonthlyLoading] = useState(false)
+
+  const loadDaily = useCallback((date) => {
+    setDailyLoading(true)
+    reportApi.getDaily(formatDate(date))
+      .then(res => setDailyReports(res.reports || []))
+      .catch(() => setDailyReports([]))
+      .finally(() => setDailyLoading(false))
+  }, [])
+
+  const loadMonthly = useCallback((month) => {
+    setMonthlyLoading(true)
+    Promise.all([
+      reportApi.getMonthly(formatMonth(month)),
+      emotionAlertApi.getAlerts(),
+    ])
+      .then(([rRes, aRes]) => {
+        setMonthlyReports(rRes.reports || [])
+        setAlerts(aRes.alerts || [])
+      })
+      .catch(() => {})
+      .finally(() => setMonthlyLoading(false))
+  }, [])
+
+  useEffect(() => { loadDaily(currentDate)  }, [currentDate])
+  useEffect(() => { loadMonthly(currentMonth) }, [currentMonth])
+
+  // 일간 날짜 네비
+  const prevDay = () => { const d = new Date(currentDate); d.setDate(d.getDate() - 1); setCurrentDate(d) }
+  const nextDay = () => {
+    const d = new Date(currentDate); d.setDate(d.getDate() + 1)
+    if (d <= TODAY) setCurrentDate(d)
+  }
+
+  // 월간 달 네비
+  const prevMonth = () => { const d = new Date(currentMonth); d.setMonth(d.getMonth() - 1); setCurrentMonth(d) }
+  const nextMonth = () => { const d = new Date(currentMonth); d.setMonth(d.getMonth() + 1); setCurrentMonth(d) }
+
+  const dateLabel = (() => {
+    const d = currentDate
+    const wds = ['일', '월', '화', '수', '목', '금', '토']
+    return `${d.getFullYear()}. ${String(d.getMonth() + 1).padStart(2, '0')}. ${String(d.getDate()).padStart(2, '0')} (${wds[d.getDay()]})`
+  })()
+
+  // 월간 캘린더 셀
+  const calCells = useMemo(() => {
+    const year = currentMonth.getFullYear()
+    const month = currentMonth.getMonth()
+    const firstDay = new Date(year, month, 1).getDay()
+    const daysInMonth = new Date(year, month + 1, 0).getDate()
+    const cells = []
+    for (let i = 0; i < firstDay; i++) cells.push(null)
+    for (let d = 1; d <= daysInMonth; d++) cells.push(d)
+    return cells
+  }, [currentMonth])
+
+  // 날짜별 dominant_emotion 맵
+  const calEmotionMap = useMemo(() => {
+    const map = {}
+    monthlyReports.forEach(r => {
+      const day = new Date(r.created_at).getDate()
+      if (!map[day]) map[day] = r.dominant_emotion
+    })
+    return map
+  }, [monthlyReports])
+
+  const isFutureDay = (day) => {
+    if (!day) return false
+    const d = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day)
+    return d > new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate())
+  }
+  const isToday = (day) =>
+    !!day &&
+    currentMonth.getFullYear() === TODAY.getFullYear() &&
+    currentMonth.getMonth() === TODAY.getMonth() &&
+    day === TODAY.getDate()
+
+  // 월간 감정 분포
+  const emotionSummary = useMemo(() => {
+    const counts = {}
+    monthlyReports.forEach(r => {
+      const e = r.dominant_emotion
+      if (e) counts[e] = (counts[e] || 0) + 1
+    })
+    const total = Object.values(counts).reduce((a, b) => a + b, 0) || 1
+    return Object.entries(counts)
+      .sort((a, b) => b[1] - a[1])
+      .map(([label, count]) => ({ label, pct: Math.round(count / total * 100) }))
+  }, [monthlyReports])
+
+  const topEmotion = emotionSummary[0]
+
+  const avgScore = useMemo(() => {
+    if (!monthlyReports.length) return 0
+    const total = monthlyReports.reduce((s, r) => {
+      const scores = [r.joy_score, r.sad_score, r.anxiety_score, r.anger_score, r.hurt_score, r.embarrass_score]
+      return s + Math.max(...scores.map(v => v || 0))
+    }, 0)
+    return Math.round(total / monthlyReports.length)
+  }, [monthlyReports])
+
+  return (
+    <div className="report-screen">
+
+      <div className="rp-bg" aria-hidden="true">
+        <span className="rp-star rs1">✦</span>
+        <span className="rp-star rs2">✦</span>
+        <span className="rp-star rs3">✦</span>
+        <span className="rp-star rs4">✦</span>
+      </div>
+
+      <ThemeToggle className="report-theme-toggle" />
+
+      <div className="rp-inner">
+
+        <div className="rp-header">
+          <h1 className="rp-title">리포트</h1>
+        </div>
+
+        <div className="rp-tabs">
+          <button className={`rp-tab${activeTab === 'daily'   ? ' active' : ''}`} onClick={() => setActiveTab('daily')}>일간</button>
+          <button className={`rp-tab${activeTab === 'monthly' ? ' active' : ''}`} onClick={() => setActiveTab('monthly')}>월간</button>
+        </div>
+
+        {/* ═══ 일간 ═══ */}
+        {activeTab === 'daily' && (
+          <>
+            <div className="rp-date-nav">
+              <button className="rp-nav-btn" onClick={prevDay}><ChevLeft /></button>
+              <span className="rp-date-label">{dateLabel}</span>
+              <button className="rp-nav-btn" onClick={nextDay} disabled={formatDate(currentDate) === formatDate(TODAY)}><ChevRight /></button>
+            </div>
+
+            {dailyLoading ? (
+              <div className="rp-empty"><p>불러오는 중...</p></div>
+            ) : dailyReports.length === 0 ? (
+              <div className="rp-empty">
+                <span className="rp-empty-emoji">🌙</span>
+                <p>이 날의 대화 기록이 없어요</p>
+              </div>
+            ) : dailyReports.map((r, idx) => {
+              const ue = EMOTIONS[r.selected_emotion] || EMOTIONS['평온']
+              const me = EMOTIONS[r.dominant_emotion]  || EMOTIONS['평온']
+              const ratios = toRatios(r)
+              return (
+                <div key={r.report_id} className="rp-session-card">
+
+                  <div className="rp-session-hdr">
+                    <span className="rp-session-num">세션 {idx + 1}</span>
+                    <span className="rp-session-time">{timeLabel(r.created_at)}</span>
+                    {r.one_line_review && (
+                      <span className="rp-session-dur" style={{ fontSize: 12, maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {r.one_line_review}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="rp-emotion-row">
+                    <div className="rp-emotion-badge" style={{ background: ue.bg, borderColor: ue.color + '60' }}>
+                      <span className="rp-badge-lbl">내가 선택</span>
+                      <span className="rp-badge-emoji">{ue.emoji}</span>
+                      <span className="rp-badge-name" style={{ color: ue.color }}>{r.selected_emotion}</span>
+                    </div>
+                    <span className="rp-vs">vs</span>
+                    <div className="rp-emotion-badge" style={{ background: me.bg, borderColor: me.color + '60' }}>
+                      <span className="rp-badge-lbl">AI 분석</span>
+                      <span className="rp-badge-emoji">{me.emoji}</span>
+                      <span className="rp-badge-name" style={{ color: me.color }}>{r.dominant_emotion}</span>
+                    </div>
+                  </div>
+
+                  {ratios.length > 0 && (
+                    <div className="rp-bar-section">
+                      <span className="rp-bar-label">감정 비율</span>
+                      <div className="rp-bar">
+                        {ratios.map(rt => (
+                          <div key={rt.label} className="rp-bar-seg" style={{ width: `${rt.pct}%`, background: EMOTIONS[rt.label]?.color }} />
+                        ))}
+                      </div>
+                      <div className="rp-legend">
+                        {ratios.map(rt => (
+                          <span key={rt.label} className="rp-legend-item">
+                            <span className="rp-dot" style={{ background: EMOTIONS[rt.label]?.color }} />{rt.label} {rt.pct}%
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                </div>
+              )
+            })}
+          </>
+        )}
+
+        {/* ═══ 월간 ═══ */}
+        {activeTab === 'monthly' && (
+          <>
+            <div className="rp-date-nav">
+              <button className="rp-nav-btn" onClick={prevMonth}><ChevLeft /></button>
+              <span className="rp-date-label">
+                {currentMonth.getFullYear()}년 {currentMonth.getMonth() + 1}월
+              </span>
+              <button className="rp-nav-btn" onClick={nextMonth}><ChevRight /></button>
+            </div>
+
+            {monthlyLoading ? (
+              <div className="rp-empty"><p>불러오는 중...</p></div>
+            ) : (
+              <>
+                <div className="rp-cal-card">
+                  <div className="rp-cal-head">
+                    {DAY_LABELS.map((l, i) => (
+                      <span key={i} className={`rp-cal-hlabel${i === 0 ? ' sun' : i === 6 ? ' sat' : ''}`}>{l}</span>
+                    ))}
+                  </div>
+                  <div className="rp-cal-body">
+                    {calCells.map((day, i) => {
+                      const future  = isFutureDay(day)
+                      const emotion = day && !future ? calEmotionMap[day] : null
+                      const em      = emotion ? EMOTIONS[emotion] : null
+                      return (
+                        <div key={i} className={`rp-cal-cell${isToday(day) ? ' is-today' : ''}`}>
+                          {em ? (
+                            <div className="rp-cal-dot" style={{ background: em.color }}>
+                              <span className="rp-cal-face">{em.emoji}</span>
+                            </div>
+                          ) : day ? (
+                            <span className={`rp-cal-num${future ? ' future' : ''}`}>{day}</span>
+                          ) : null}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                <div className="rp-cal-legend">
+                  {Object.entries(EMOTIONS).slice(0, 7).map(([label, e]) => (
+                    <span key={label} className="rp-legend-item">
+                      <span className="rp-dot" style={{ background: e.color }} />{label}
+                    </span>
+                  ))}
+                </div>
+
+                <div className="rp-sum-row">
+                  <div className="rp-sum-card">
+                    <span className="rp-sum-label">이번 달 세션</span>
+                    <span className="rp-sum-val">{monthlyReports.length}<span className="rp-sum-unit">회</span></span>
+                  </div>
+                  <div className="rp-sum-card">
+                    <span className="rp-sum-label">최다 감정</span>
+                    <span className="rp-sum-val" style={{ color: EMOTIONS[topEmotion?.label]?.color }}>
+                      {topEmotion ? `${EMOTIONS[topEmotion.label]?.emoji} ${topEmotion.label}` : '-'}
+                    </span>
+                  </div>
+                  <div className="rp-sum-card">
+                    <span className="rp-sum-label">평균 점수</span>
+                    <span className="rp-sum-val">{avgScore || '-'}{avgScore ? <span className="rp-sum-unit">점</span> : ''}</span>
+                  </div>
+                </div>
+
+                {emotionSummary.length > 0 && (
+                  <div className="rp-data-card">
+                    <h3 className="rp-data-title">이달의 감정 분포</h3>
+                    <div className="rp-bar rp-bar--lg">
+                      {emotionSummary.map(({ label, pct }) => (
+                        <div key={label} className="rp-bar-seg" style={{ width: `${pct}%`, background: EMOTIONS[label]?.color }} />
+                      ))}
+                    </div>
+                    <div className="rp-legend" style={{ marginTop: 10 }}>
+                      {emotionSummary.map(({ label, pct }) => (
+                        <span key={label} className="rp-legend-item">
+                          <span className="rp-dot" style={{ background: EMOTIONS[label]?.color }} />{label} {pct}%
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {monthlyReports.length === 0 && (
+                  <div className="rp-empty">
+                    <span className="rp-empty-emoji">🌙</span>
+                    <p>이번 달 대화 기록이 없어요</p>
+                  </div>
+                )}
+
+                {alerts.length > 0 && (
+                  <div className="rp-alert-card">
+                    <div className="rp-alert-hdr">
+                      <h3 className="rp-data-title">감정 주의 신호 이력</h3>
+                      <span className="rp-alert-count">{alerts.length}건</span>
+                    </div>
+                    <p className="rp-alert-desc">같은 부정 감정이 5일 연속 감지될 때 기록돼요</p>
+                    <div className="rp-alert-list">
+                      {alerts.map(alert => {
+                        const em = EMOTIONS[alert.alerts_emotion]
+                        const confirmed = alert.is_confirmed === 'Y'
+                        return (
+                          <div key={alert.alert_id} className={`rp-alert-item${confirmed ? ' confirmed' : ''}`}>
+                            <div className="rp-alert-icon" style={{ background: em?.bg, borderColor: (em?.color || '#aaa') + '55' }}>
+                              <span>{em?.emoji || '⚠️'}</span>
+                            </div>
+                            <div className="rp-alert-body">
+                              <div className="rp-alert-top">
+                                <span className="rp-alert-emotion" style={{ color: em?.color }}>{alert.alerts_emotion}</span>
+                                <span className="rp-alert-reason">{alert.alerts_reason}</span>
+                              </div>
+                              <span className="rp-alert-date">{new Date(alert.created_at).toLocaleDateString('ko-KR')}</span>
+                            </div>
+                            <span className={`rp-alert-badge${confirmed ? ' confirmed' : ''}`}>
+                              {confirmed ? '확인됨' : '미확인'}
+                            </span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </>
+        )}
+
+      </div>
+    </div>
+  )
+}
+
+export default Report

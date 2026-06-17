@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import './Signup.css'
 import { authApi } from '../../api/auth'
-import { setAccessToken } from '../../api/client'
+import { useAuth } from '../../contexts/AuthContext'
 import googleImg from '../../assets/public/구글.png'
 import naverImg  from '../../assets/public/네이버.png'
 import kakaoImg  from '../../assets/public/카카오.png'
@@ -47,6 +47,7 @@ const CheckIcon = () => (
 
 const Signup = () => {
   const navigate = useNavigate()
+  const { login } = useAuth()
   const [showPw, setShowPw]             = useState(false)
   const [showConfirm, setShowConfirm]   = useState(false)
   const [emailChecked, setEmailChecked] = useState(false)
@@ -94,7 +95,7 @@ const Signup = () => {
     if (!form.gender)                                          e.gender   = '성별을 선택해주세요.'
     if (!form.email || !/\S+@\S+\.\S+/.test(form.email))      e.email    = '올바른 이메일을 입력해주세요.'
     else if (!emailChecked)                                    e.email    = '이메일 중복확인을 해주세요.'
-    if (form.password.length < 8)                              e.password = '비밀번호는 8자 이상이어야 합니다.'
+    if (!/^(?=.*[A-Za-z])(?=.*\d).{8,100}$/.test(form.password)) e.password = '비밀번호는 영문과 숫자를 포함한 8자 이상이어야 합니다.'
     if (form.password !== form.confirm)                        e.confirm  = '비밀번호가 일치하지 않습니다.'
     if (!agreed)                                               e.agreed   = '이용약관에 동의해주세요.'
     return e
@@ -117,8 +118,8 @@ const Signup = () => {
         birth_date,
         terms_agreed: true,
       })
-      if (res.access_token) setAccessToken(res.access_token)
-      navigate('/login')
+      if (res.access_token) login(res.access_token, res.user)
+      navigate('/onboarding')
     } catch (err) {
       setErrors(e => ({ ...e, submit: err.message || '회원가입에 실패했습니다.' }))
     } finally {

@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import './main.css'
 import { useTheme } from '../../contexts/ThemeContext'
+import { useAuth } from '../../contexts/AuthContext'
 import ThemeToggle  from '../Public/ThemeToggle'
 
 import logoDarkImg  from '../../assets/dark/달리로고.png'
@@ -27,6 +28,7 @@ const Main = () => {
   const navigate = useNavigate()
   const [selected, setSelected] = useState(null)
   const { isDark } = useTheme()
+  const { isAuthenticated } = useAuth()
 
   return (
     <div className="main-screen">
@@ -49,7 +51,9 @@ const Main = () => {
 
       <div className="main-inner">
 
-        <button className="main-back-btn" onClick={() => navigate('/')} aria-label="뒤로가기">‹</button>
+        {!isAuthenticated && (
+          <button className="main-back-btn" onClick={() => navigate('/')} aria-label="뒤로가기">‹</button>
+        )}
 
         {/* 로고 배너 */}
         <img src={isDark ? logoDarkImg : logoLightImg} alt="" className="main-logo" />
@@ -128,8 +132,6 @@ const Main = () => {
           </button>
           <div className="main-footer-links">
             <button className="main-skip" onClick={() => navigate('/chat', { state: { isOnboarding: true } })}>잘 모르겠어요</button>
-            <span className="main-sep" aria-hidden="true">|</span>
-            <button className="main-skip" onClick={() => navigate('/chat')}>건너뛰기</button>
           </div>
         </div>
 
