@@ -356,7 +356,7 @@ async function handleSnsLogin(res, { provider, sns_id, email, nick_name, birth_d
     // 브라우저 리다이렉트 방식 — access_token을 단기 쿠키에 담아 프론트로 이동
     res.cookie('sns_access_token', access_token, { maxAge: 30 * 1000, httpOnly: false });
     // onboarding_completed 여부에 따라 온보딩 or 메인으로 분기
-    const destination = safeUser.onboarding_completed ? '/main' : '/chat?isOnboarding=true';
+    const destination = safeUser.onboarding_completed ? '/main' : '/onboarding';
     return res.redirect(`${FRONTEND_URL}${destination}`);
   }
   return res.json({ access_token, user: safeUser });

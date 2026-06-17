@@ -85,8 +85,8 @@ async function endSession(req, res) {
     if (isConsecutive) {
       await emotionAlertRepo.createAlert({
         user_id: req.user.user_id,
-        alerts_emotion: dominant_emotion,
-        alerts_reason: `${dominant_emotion} 5일 연속 분석`,
+        alerted_emotion: dominant_emotion,
+        alert_reason: `${dominant_emotion} 5일 연속 분석`,
       });
     }
   }

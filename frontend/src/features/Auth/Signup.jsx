@@ -7,6 +7,10 @@ import googleImg from '../../assets/public/구글.png'
 import naverImg  from '../../assets/public/네이버.png'
 import kakaoImg  from '../../assets/public/카카오.png'
 
+// 소셜 로그인은 Vite proxy 우회해서 백엔드 직접 호출 (Docker/로컬 모두 localhost:3000)
+const SOCIAL_BASE = import.meta.env.VITE_SOCIAL_BASE || import.meta.env.VITE_API_URL || ''
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID
+
 const UserIcon = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
     <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" />
@@ -45,7 +49,7 @@ const CheckIcon = () => (
   </svg>
 )
 
-const Signup = () => {
+const Signup = ({ onTabChange }) => {
   const navigate = useNavigate()
   const { login } = useAuth()
   const [showPw, setShowPw]             = useState(false)
@@ -56,8 +60,9 @@ const Signup = () => {
     nickname: '', birthDay: '', birthMonth: '', birthYear: '',
     gender: '', email: '', password: '', confirm: '',
   })
-  const [errors, setErrors] = useState({})
-  const [loading, setLoading] = useState(false)
+  const [errors,       setErrors]       = useState({})
+  const [loading,      setLoading]      = useState(false)
+  const [signupDone,   setSignupDone]   = useState(false)
 
   const handleChange = (e) => {
     const { name, value } = e.target
@@ -110,7 +115,7 @@ const Signup = () => {
 
     setLoading(true)
     try {
-      const res = await authApi.signup({
+      await authApi.signup({
         email: form.email,
         pwd: form.password,
         nick_name: form.nickname,
@@ -118,8 +123,8 @@ const Signup = () => {
         birth_date,
         terms_agreed: true,
       })
-      if (res.access_token) login(res.access_token, res.user)
-      navigate('/onboarding')
+      setSignupDone(true)
+      setTimeout(() => onTabChange?.('login'), 1800)
     } catch (err) {
       setErrors(e => ({ ...e, submit: err.message || '회원가입에 실패했습니다.' }))
     } finally {
@@ -228,9 +233,10 @@ const Signup = () => {
       </label>
       {errors.agreed && <p className="form-error">{errors.agreed}</p>}
       {errors.submit && <p className="form-error">{errors.submit}</p>}
+      {signupDone && <p className="form-success">가입이 완료됐어요! 로그인해주세요 🌙</p>}
 
       {/* 회원가입 버튼 */}
-      <button type="submit" className="btn-cta" disabled={loading}>
+      <button type="submit" className="btn-cta" disabled={loading || signupDone}>
         <span className="sparkle">✦</span>
         {loading ? '가입 중...' : '회원가입'}
         <span className="sparkle">✦</span>
@@ -239,17 +245,43 @@ const Signup = () => {
       {/* 소셜 */}
       <div className="auth-divider"><span>또는</span></div>
       <div className="social-list">
-        <button type="button" className="btn-social" onClick={() => {}}>
-          <span className="social-badge google-badge"><img src={googleImg} alt="Google" /></span>
-          <span className="social-label">Google로 시작하기</span>
-        </button>
-        <button type="button" className="btn-social" onClick={() => {}}>
+        <button type="button" className="btn-social" onClick={() => {
+          window.location.href = `${SOCIAL_BASE}/api/auth/naver`
+        }}>
           <span className="social-badge"><img src={naverImg} alt="Naver" /></span>
           <span className="social-label">Naver로 시작하기</span>
         </button>
-        <button type="button" className="btn-social" onClick={() => {}}>
+        <button type="button" className="btn-social" onClick={() => {
+          window.location.href = `${SOCIAL_BASE}/api/auth/kakao`
+        }}>
           <span className="social-badge"><img src={kakaoImg} alt="Kakao" /></span>
           <span className="social-label">Kakao로 시작하기</span>
+        </button>
+        <button type="button" className="btn-social" onClick={() => {
+          if (!GOOGLE_CLIENT_ID || !window.google) {
+            setErrors(e => ({ ...e, submit: 'Google 로그인을 사용할 수 없습니다.' }))
+            return
+          }
+          window.google.accounts.oauth2.initTokenClient({
+            client_id: GOOGLE_CLIENT_ID,
+            scope: 'openid email profile',
+            callback: async (tokenResponse) => {
+              if (!tokenResponse.access_token) return
+              setLoading(true)
+              try {
+                const res = await authApi.googleLogin({ access_token: tokenResponse.access_token })
+                login(res.access_token, res.user)
+                navigate(res.user?.onboarding_completed ? '/main' : '/onboarding')
+              } catch (err) {
+                setErrors(e => ({ ...e, submit: err.message || 'Google 로그인에 실패했습니다.' }))
+              } finally {
+                setLoading(false)
+              }
+            },
+          }).requestAccessToken()
+        }}>
+          <span className="social-badge google-badge"><img src={googleImg} alt="Google" /></span>
+          <span className="social-label">Google로 시작하기</span>
         </button>
       </div>
 
