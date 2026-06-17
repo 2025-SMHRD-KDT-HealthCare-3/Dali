@@ -4,7 +4,8 @@
  * - endSession            : 세션 종료 (ended_at 업데이트)
  * - findSessionsByUser    : 사용자의 세션 목록 조회 (페이지네이션)
  * - findSessionById       : 세션 단건 조회
- * - findMessagesBySession : 세션의 대화 히스토리 조회 (emotion_logs + log_analyses JOIN)
+ * - findMessagesBySession : 세션의 대화 히스토리 조회 (chat_logs + chat_analyses JOIN)
+ * - resetUserData         : 데이터 초기화 (개인정보 제외 전체 삭제)
  * - checkConsecutiveDays  : 특정 감정이 N일 연속인지 확인
  */
 
@@ -43,15 +44,15 @@ async function findSessionById(session_id) {
   return rows[0];
 }
 
-// emotion_logs(발화)와 log_analyses(감정 점수)를 JOIN해서 대화 히스토리 반환
+// chat_logs(발화)와 chat_analyses(감정 점수)를 JOIN해서 대화 히스토리 반환
 async function findMessagesBySession(session_id) {
   const [rows] = await pool.query(
-    `SELECT el.log_id, el.utterance, el.turn_idx, el.spoken_at,
-            la.joy_score, la.sad_score, la.anxiety_score, la.anger_score, la.hurt_score, la.embarrass_score
-     FROM emotion_logs el
-     LEFT JOIN log_analyses la ON el.log_id = la.log_id
-     WHERE el.session_id = ?
-     ORDER BY el.turn_idx ASC`,
+    `SELECT cl.log_id, cl.speaker, cl.utterance, cl.turn_idx, cl.spoken_at,
+            ca.joy_score, ca.sad_score, ca.anxiety_score, ca.anger_score, ca.hurt_score, ca.embarrass_score
+     FROM chat_logs cl
+     LEFT JOIN chat_analyses ca ON cl.log_id = ca.log_id
+     WHERE cl.session_id = ?
+     ORDER BY cl.turn_idx ASC`,
     [session_id]
   );
   return rows;
@@ -72,4 +73,32 @@ async function checkConsecutiveDays(user_id, emotion, days = 5) {
   return rows[0].cnt >= days;
 }
 
-module.exports = { createSession, endSession, findSessionsByUser, findSessionById, findMessagesBySession, checkConsecutiveDays };
+// 사용자 데이터 초기화 — 개인정보 제외한 모든 활동 데이터 삭제 (트랜잭션)
+async function resetUserData(user_id) {
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    // FK 의존 순서대로 삭제
+    await conn.query('DELETE ca FROM chat_analyses ca JOIN chat_logs cl ON ca.log_id = cl.log_id JOIN sessions s ON cl.session_id = s.session_id WHERE s.user_id = ?', [user_id]);
+    await conn.query('DELETE cl FROM chat_logs cl JOIN sessions s ON cl.session_id = s.session_id WHERE s.user_id = ?', [user_id]);
+    await conn.query('DELETE FROM reports WHERE user_id = ?', [user_id]);
+    await conn.query('DELETE FROM session_analyses WHERE user_id = ?', [user_id]);
+    await conn.query('DELETE FROM summaries WHERE user_id = ?', [user_id]);
+    await conn.query('DELETE FROM missions WHERE user_id = ?', [user_id]);
+    await conn.query('DELETE FROM risk_events WHERE user_id = ?', [user_id]);
+    await conn.query('DELETE FROM sessions WHERE user_id = ?', [user_id]);
+    await conn.query('DELETE FROM onboardings WHERE user_id = ?', [user_id]);
+    await conn.query('DELETE FROM emotion_alerts WHERE user_id = ?', [user_id]);
+    await conn.query('UPDATE users SET persona = NULL, p_checked_at = NULL WHERE user_id = ?', [user_id]);
+
+    await conn.commit();
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
+  }
+}
+
+module.exports = { createSession, endSession, findSessionsByUser, findSessionById, findMessagesBySession, checkConsecutiveDays, resetUserData };

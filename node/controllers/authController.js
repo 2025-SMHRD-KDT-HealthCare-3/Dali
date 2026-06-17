@@ -7,10 +7,11 @@
  * - refresh             : POST   /api/auth/refresh                 액세스 토큰 재발급
  * - passwordResetRequest: POST   /api/auth/password/reset-request  비밀번호 재설정 요청
  * - passwordReset       : POST   /api/auth/password/reset          비밀번호 재설정
- * - kakaoAuth           : POST   /api/auth/kakao                   카카오 로그인
- * - naverAuth           : POST   /api/auth/naver                   네이버 로그인
+ * - kakaoLoginRedirect  : GET    /api/auth/kakao                   카카오 로그인 페이지로 리다이렉트
+ * - kakaoAuth           : GET    /api/auth/kakao/callback          카카오 OAuth 콜백 처리
+ * - naverLoginRedirect  : GET    /api/auth/naver                   네이버 로그인 페이지로 리다이렉트
+ * - naverAuth           : GET    /api/auth/naver/callback          네이버 OAuth 콜백 처리
  * - googleAuth          : POST   /api/auth/google                  구글 로그인
- * - snsRegister         : POST   /api/auth/sns/register            SNS 신규 유저 추가 정보 등록
  * - getMe               : GET    /api/users/me                     회원정보 조회
  * - updateMe            : PUT    /api/users/me                     회원정보 수정
  * - updatePersona       : PATCH  /api/users/me/persona             페르소나 저장
@@ -333,15 +334,20 @@ async function deleteMe(req, res) {
 async function handleSnsLogin(res, { provider, sns_id, email, nick_name, birth_date = null, gender = null, isRedirect = false }) {
   const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 
-  let user = await userRepo.findByProviderInfo(provider, sns_id);
+  let existing = await userRepo.findByProviderInfo(provider, sns_id);
 
-  // 신규 유저면 플랫폼에서 받아온 정보로 바로 생성
-  if (!user) {
-    const userId = await userRepo.createUser({
+  let userId;
+  if (!existing) {
+    // 신규 유저면 플랫폼에서 받아온 정보로 바로 생성
+    userId = await userRepo.createUser({
       email, pwd: null, nick_name: nick_name || null, gender, birth_date, provider, sns_id,
     });
-    user = await userRepo.findById(userId);
+  } else {
+    userId = existing.user_id;
   }
+
+  // findById로 재조회 — onboarding_completed 파생 컬럼 포함
+  const user = await userRepo.findById(userId);
 
   const { pwd: _, ...safeUser } = user;
   const access_token = issueTokens(res, safeUser);
