@@ -70,36 +70,40 @@ CREATE TABLE sessions (
 
 
 
--- 테이블 생성 SQL - emotion_logs
+-- 테이블 생성 SQL - chat_logs
 
-CREATE TABLE emotion_logs (
+CREATE TABLE chat_logs (
     log_id     INT           AUTO_INCREMENT PRIMARY KEY COMMENT '로그고유번호',
     user_id    INT           NOT NULL                   COMMENT '회원고유번호',
     session_id INT           NOT NULL                   COMMENT '세션고유번호',
+    speaker    VARCHAR(10)   NOT NULL                   COMMENT '발화자',
     utterance  VARCHAR(1000) NOT NULL                   COMMENT '발화내용',
     turn_idx   INT           NOT NULL                   COMMENT '발화순서',
     spoken_at  DATETIME      NOT NULL DEFAULT NOW()     COMMENT '발화일시',
+
+    -- Unique 제약조건 내부 선언 (같은 세션에서 동일 순서 발화 불가)
+    UNIQUE (session_id, turn_idx),
     
-    -- Foreign Key 설정 - emotion_logs(user_id) -> users(user_id)
-    CONSTRAINT fk_emotion_logs_users FOREIGN KEY (user_id) 
+    -- Foreign Key 설정 - chat_logs(user_id) -> users(user_id)
+    CONSTRAINT fk_chat_logs_users FOREIGN KEY (user_id) 
         REFERENCES users (user_id) ON DELETE RESTRICT ON UPDATE RESTRICT,
         
-    -- Foreign Key 설정 - emotion_logs(session_id) -> sessions(session_id)
-    CONSTRAINT fk_emotion_logs_sessions FOREIGN KEY (session_id) 
+    -- Foreign Key 설정 - chat_logs(session_id) -> sessions(session_id)
+    CONSTRAINT fk_chat_logs_sessions FOREIGN KEY (session_id) 
         REFERENCES sessions (session_id) ON DELETE RESTRICT ON UPDATE RESTRICT
-) COMMENT='감정로그. 말풍선별 실시간 발화 내용을 저장';
+) COMMENT='채팅 로그. 말풍선별 실시간 발화 내용을 저장';
 
--- Foreign Key 삭제 - emotion_logs(user_id)
--- ALTER TABLE emotion_logs DROP FOREIGN KEY fk_emotion_logs_users;
+-- Foreign Key 삭제 - chat_logs(user_id)
+-- ALTER TABLE chat_logs DROP FOREIGN KEY fk_chat_logs_users;
 
--- Foreign Key 삭제 - emotion_logs(session_id)
--- ALTER TABLE emotion_logs DROP FOREIGN KEY fk_emotion_logs_sessions;
+-- Foreign Key 삭제 - chat_logs(session_id)
+-- ALTER TABLE chat_logs DROP FOREIGN KEY fk_chat_logs_sessions;
 
 
 
--- 테이블 생성 SQL - log_analyses
+-- 테이블 생성 SQL - chat_analyses
 
-CREATE TABLE log_analyses (
+CREATE TABLE chat_analyses (
     analysis_id     INT          AUTO_INCREMENT PRIMARY KEY COMMENT '분석고유번호',
     user_id         INT          NOT NULL                   COMMENT '회원고유번호',
     log_id          INT          NOT NULL                   COMMENT '로그고유번호',
@@ -111,20 +115,20 @@ CREATE TABLE log_analyses (
     embarrass_score DECIMAL(4,1) NOT NULL DEFAULT 0.0       COMMENT '당황 점수',
     analyzed_at     DATETIME     NOT NULL DEFAULT NOW()     COMMENT '분석일시',
     
-    -- Foreign Key 설정 - log_analyses(log_id) -> emotion_logs(log_id)
-    CONSTRAINT fk_log_analyses_emotion_logs FOREIGN KEY (log_id) 
-        REFERENCES emotion_logs (log_id) ON DELETE CASCADE ON UPDATE RESTRICT,
+    -- Foreign Key 설정 - chat_analyses(log_id) -> chat_logs(log_id)
+    CONSTRAINT fk_chat_analyses_chat_logs FOREIGN KEY (log_id) 
+        REFERENCES chat_logs (log_id) ON DELETE CASCADE ON UPDATE RESTRICT,
         
-    -- Foreign Key 설정 - log_analyses(user_id) -> users(user_id)
-    CONSTRAINT fk_log_analyses_users FOREIGN KEY (user_id) 
+    -- Foreign Key 설정 - chat_analyses(user_id) -> users(user_id)
+    CONSTRAINT fk_chat_analyses_users FOREIGN KEY (user_id) 
         REFERENCES users (user_id) ON DELETE RESTRICT ON UPDATE RESTRICT
-) COMMENT='감정분석. 감정 분석 결과';
+) COMMENT='채팅 분석. 말풍선별 감정 점수 결과 저장';
 
--- Foreign Key 삭제 - log_analyses(log_id)
--- ALTER TABLE log_analyses DROP FOREIGN KEY fk_log_analyses_emotion_logs;
+-- Foreign Key 삭제 - chat_analyses(log_id)
+-- ALTER TABLE chat_analyses DROP FOREIGN KEY fk_chat_analyses_chat_logs;
 
--- Foreign Key 삭제 - log_analyses(user_id)
--- ALTER TABLE log_analyses DROP FOREIGN KEY fk_log_analyses_users;
+-- Foreign Key 삭제 - chat_analyses(user_id)
+-- ALTER TABLE chat_analyses DROP FOREIGN KEY fk_chat_analyses_users;
 
 
 
