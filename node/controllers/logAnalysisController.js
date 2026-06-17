@@ -1,5 +1,5 @@
 /*
- * logAnalysisController - 발화별 감정 분석 (log_analyses)
+ * logAnalysisController - 발화별 감정 분석 (chat_analyses)
  * - getLogAnalysesBySession : GET /api/log-analyses?session_id=X  세션의 발화별 감정 분석 목록 (페이지네이션)
  */
 

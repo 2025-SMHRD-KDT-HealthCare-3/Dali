@@ -122,7 +122,7 @@ async function getSessionById(req, res) {
   res.json({ session });
 }
 
-// 세션 대화 히스토리 조회 — 발화(emotion_logs)와 감정분석(log_analyses) JOIN해서 반환
+// 세션 대화 히스토리 조회 — 발화(chat_logs)와 감정분석(chat_analyses) JOIN해서 반환
 async function getSessionMessages(req, res) {
   const { id } = req.params;
   const session = await sessionRepo.findSessionById(id);
@@ -138,4 +138,10 @@ async function getSessionMessages(req, res) {
   res.json({ messages });
 }
 
-module.exports = { startSession, endSession, getSessions, getSessionById, getSessionMessages };
+// 데이터 초기화 — 개인정보 제외한 모든 활동 데이터 삭제
+async function resetSessions(req, res) {
+  await sessionRepo.resetUserData(req.user.user_id);
+  res.json({ message: '데이터가 초기화되었습니다.' });
+}
+
+module.exports = { startSession, endSession, getSessions, getSessionById, getSessionMessages, resetSessions };
