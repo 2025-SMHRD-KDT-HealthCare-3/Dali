@@ -4,6 +4,7 @@ import './chat.css'
 import { onboardingApi } from '../../api/onboarding'
 import { sessionApi } from '../../api/sessions'
 import { chatApi } from '../../api/chat'
+import { userApi } from '../../api/user'
 import { useAuth } from '../../contexts/AuthContext'
 import chatBgDark     from '../../assets/dark/챗봇 배경.png'
 import chatBgLight    from '../../assets/light/챗봇 배경 라이트.png'
@@ -21,11 +22,18 @@ const OB_QUESTIONS = [
   { key: 'energy',        cond: false, question_no: 2, text: '요즘 하루 에너지 수준은 어떤가요?',      type: 'qr',   opts: ['일상적인 일을 해낼 만큼 활력이 있어요', '생각이 많고 복잡해서 정신적인 에너지가 부족해요', '꼭 해야 할 일만 겨우 하거나 자꾸 미루게 돼요', '하루를 버티는 것도 힘들어요'] },
   { key: 'topic',         cond: false, question_no: 3, text: '최근 가장 신경 쓰이는 영역은 무엇인가요?', type: 'qr',  opts: ['학업 및 진로 방향', '직장 업무와 성과', '가족, 친구, 연인 등 대인관계', '나 자신에 대한 성격이나 자존감', '특별한 고민은 없어요'] },
   { key: 'coachingStyle', cond: false, question_no: 4, text: '달리와 어떤 시간을 보내고 싶나요?',      type: 'qr',   opts: ['친구처럼 편하게 이야기하고 싶어요', '복잡한 마음을 정리하고 싶어요', '작은 것부터 다시 시작하고 싶어요', '따뜻한 위로를 받고 싶어요'] },
-  { key: 'checkinTime',   cond: false, text: '하루 중 달리와 마음을 나누기 좋은 시간대는 언제예요?',    type: 'qr',   opts: ['아침', '낮', '저녁', '밤'] },
 ]
 
 // Onboarding Q1 선택지
 const EMOTION_OPTS = ['생각이 많고 복잡해요', '마음이 조금 지쳐있어요', '아무것도 하기 싫어요', '편하게 이야기하고 싶어요']
+
+// Q4 답변 → 페르소나 직접 매핑 (onboarding_completed 설정용)
+const Q4_TO_PERSONA = {
+  '친구처럼 편하게 이야기하고 싶어요': '친구형',
+  '복잡한 마음을 정리하고 싶어요':     '분석형',
+  '작은 것부터 다시 시작하고 싶어요':  '동기부여형',
+  '따뜻한 위로를 받고 싶어요':         '공감형',
+}
 
 // Main.jsx 감정 ID → 한국어 이름 (세션 selected_emotion으로 전달)
 const EMOTION_LABEL = {
@@ -80,11 +88,12 @@ const Chat = () => {
   const navigate  = useNavigate()
   const location  = useLocation()
   const { isDark } = useTheme()
-  const { user, isAuthenticated } = useAuth()
+  const { user, isAuthenticated, setUser } = useAuth()
   const bottomRef = useRef(null)
 
   const locState    = location.state || {}
-  const startInOb   = !!locState.isOnboarding
+  // 온보딩 완료한 회원은 채팅 재진입 시 온보딩 질문 스킵
+  const startInOb   = !!locState.isOnboarding && !(isAuthenticated && user?.onboarding_completed)
 
   /* ── 온보딩 상태 ── */
   const [obMode,    setObMode]   = useState(startInOb)
@@ -120,10 +129,13 @@ const Chat = () => {
   const [sessionId, setSessionId] = useState(null)
   const sessionIdRef = useRef(null)
 
+  const VALID_EMOTIONS = new Set(['기쁨', '슬픔', '불안', '분노', '상처', '당황'])
+
   const startSession = async (emotionId) => {
     if (!isAuthenticated) return
+    const emotion = EMOTION_LABEL[emotionId] || emotionId
+    if (!emotion || !VALID_EMOTIONS.has(emotion)) return
     try {
-      const emotion = EMOTION_LABEL[emotionId] || emotionId
       const res = await sessionApi.startSession(emotion)
       setSessionId(res.session_id)
       sessionIdRef.current = res.session_id
@@ -205,6 +217,9 @@ const Chat = () => {
       setTimeout(() => {
         addDali('다 물어봤어요! 이제 함께 이야기해요 🌙✨')
         setIsTyping(false)
+        if (isAuthenticated) {
+          setUser(prev => ({ ...prev, onboarding_completed: true }))
+        }
         submitOnboarding(newAnswers)
         startSession(newAnswers.emotion || locState.emotion)
         setTimeout(() => {
@@ -226,7 +241,6 @@ const Chat = () => {
     for (const q of questionsToSubmit) {
       let optionIdx
       if (q.key === 'emotion') {
-        // Main.jsx의 감정 아이콘 ID → Q1 인덱스 변환
         optionIdx = EMOTION_ID_TO_IDX[all.emotion] || 0
       } else {
         const textAnswer = all[q.key]
@@ -249,6 +263,19 @@ const Chat = () => {
         console.error(`[chat ob] Q${q.question_no} 저장 실패:`, err)
       }
     }
+
+    // Q4 답변 → 페르소나 자동저장 → onboarding_completed = true
+    if (isAuthenticated) {
+      const derivedPersona = Q4_TO_PERSONA[all.coachingStyle] || null
+      if (derivedPersona) {
+        try {
+          await userApi.updatePersona(derivedPersona)
+          setUser(prev => ({ ...prev, persona: derivedPersona, onboarding_completed: true }))
+        } catch (err) {
+          console.error('[chat ob] updatePersona failed:', err)
+        }
+      }
+    }
   }
 
   /* ── 일반 채팅 메시지 전송 ── */
@@ -261,7 +288,7 @@ const Chat = () => {
 
     try {
       const body = { message: trimmed }
-      if (isAuthenticated && sessionId) body.session_id = sessionId
+      if (isAuthenticated && sessionIdRef.current) body.session_id = sessionIdRef.current
 
       const res = await chatApi.sendMessage(body)
 

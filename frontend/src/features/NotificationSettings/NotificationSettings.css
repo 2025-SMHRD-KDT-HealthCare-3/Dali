@@ -1,0 +1,162 @@
+/* ══════════════════════════════════════════════
+   NotificationSettings Screen — 알림 설정
+══════════════════════════════════════════════ */
+
+.ns-screen {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  overflow-x: hidden;
+  overflow-y: auto;
+  background: var(--bg-screen);
+  font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+.ns-bg {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+.ns-star {
+  position: absolute;
+  color: #f6e39a;
+  pointer-events: none;
+  animation: ns-twinkle 3.5s ease-in-out infinite;
+}
+@keyframes ns-twinkle {
+  0%, 100% { opacity: 0.18; transform: scale(0.8); }
+  50%       { opacity: 0.82; transform: scale(1.2); }
+}
+.ns-star.nss1 { top:  8%; left:  12%; font-size: 12px; animation-delay: 0s;   }
+.ns-star.nss2 { top: 22%; right: 16%; font-size:  7px; animation-delay: 1.1s; }
+.ns-star.nss3 { top: 58%; left:   7%; font-size:  9px; animation-delay: 0.6s; }
+.ns-star.nss4 { top: 75%; right: 12%; font-size: 11px; animation-delay: 2s;   }
+
+.ns-theme-toggle {
+  position: fixed;
+  top: 18px;
+  right: 18px;
+  z-index: 100;
+}
+
+/* ── 레이아웃 ── */
+.ns-inner {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 20px 20px 40px;
+  max-width: 480px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+/* ── 헤더 ── */
+.ns-header {
+  display: flex;
+  align-items: center;
+  padding: 8px 0 4px;
+}
+.ns-back {
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  font-size: 26px;
+  cursor: pointer;
+  padding: 4px 10px 4px 0;
+  line-height: 1;
+}
+.ns-title {
+  flex: 1;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+  text-align: center;
+  margin: 0;
+}
+.ns-header-end { width: 34px; }
+
+.ns-desc {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+/* ── 토글 목록 ── */
+.ns-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ns-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+}
+.ns-emoji { font-size: 22px; flex-shrink: 0; }
+.ns-item-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.ns-item-label { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+.ns-item-desc  { font-size: 12px; color: var(--text-secondary); line-height: 1.4; }
+
+/* ── 토글 버튼 ── */
+.ns-toggle {
+  flex-shrink: 0;
+  width: 48px;
+  height: 27px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.12);
+  border: none;
+  cursor: pointer;
+  position: relative;
+  transition: background 0.22s;
+  padding: 0;
+}
+.ns-toggle.is-on {
+  background: linear-gradient(135deg, #7B5FEF, #9B7EFF);
+}
+.ns-tog-thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 21px;
+  height: 21px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.22s;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.25);
+}
+.ns-toggle.is-on .ns-tog-thumb {
+  transform: translateX(21px);
+}
+
+/* ── 안내 문구 ── */
+.ns-notice {
+  font-size: 11px;
+  color: var(--text-secondary);
+  opacity: 0.55;
+  margin: 0;
+  text-align: center;
+}
+
+/* ── 라이트 모드 ── */
+[data-theme="light"] .ns-item {
+  background: rgba(255, 255, 255, 0.75);
+  border-color: rgba(123, 95, 239, 0.1);
+}
+[data-theme="light"] .ns-toggle {
+  background: rgba(0, 0, 0, 0.1);
+}

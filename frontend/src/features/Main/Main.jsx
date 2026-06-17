@@ -28,7 +28,7 @@ const Main = () => {
   const navigate = useNavigate()
   const [selected, setSelected] = useState(null)
   const { isDark } = useTheme()
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, user } = useAuth()
 
   return (
     <div className="main-screen">
@@ -126,12 +126,12 @@ const Main = () => {
         <div className="main-actions">
           <button
             className={`main-btn-next${!selected ? ' is-disabled' : ''}`}
-            onClick={() => selected && navigate('/chat', { state: { isOnboarding: true, emotion: selected } })}
+            onClick={() => selected && navigate('/chat', { state: { isOnboarding: !user?.onboarding_completed, emotion: selected } })}
           >
             {selected ? '다음' : '감정을 선택해주세요'} <span className="btn-arrow">›</span>
           </button>
           <div className="main-footer-links">
-            <button className="main-skip" onClick={() => navigate('/chat', { state: { isOnboarding: true } })}>잘 모르겠어요</button>
+            <button className="main-skip" onClick={() => navigate('/chat', { state: { isOnboarding: !user?.onboarding_completed, emotion: 'anxiety' } })}>잘 모르겠어요</button>
           </div>
         </div>
 

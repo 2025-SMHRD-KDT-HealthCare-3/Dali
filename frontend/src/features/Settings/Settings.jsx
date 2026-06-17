@@ -7,14 +7,12 @@ import avatarImg       from '../../assets/public/설정 달리 아바타.png'
 import icProfileDark   from '../../assets/dark/다크개인정보.png'
 import icDarkModeDark  from '../../assets/dark/다크다크모드.png'
 import icLightModeDark from '../../assets/dark/다크라이트모드.png'
-import icSecurityDark  from '../../assets/dark/다크보안.png'
 import icAlarmDark     from '../../assets/dark/다크알림.png'
 import icDataDark      from '../../assets/dark/다크데이터보관.png'
 
 import icProfileLight   from '../../assets/light/개인정보.png'
 import icLightModeLight from '../../assets/light/라이트모드.png'
 import icDarkModeLight  from '../../assets/light/다크모드.png'
-import icSecurityLight  from '../../assets/light/보안.png'
 import icAlarmLight     from '../../assets/light/알림.png'
 import icDataLight      from '../../assets/light/데이터보관.png'
 
@@ -25,9 +23,8 @@ const Settings = () => {
   const MENU_ITEMS = [
     { id: 'profile',  img: isDark ? icProfileDark  : icProfileLight,   label: '개인정보 수정',      type: 'arrow', to: '/info' },
     { id: 'theme',    img: isDark ? icDarkModeDark : icLightModeLight,  label: '라이트 / 다크 모드', type: 'toggle' },
-    { id: 'security', img: isDark ? icSecurityDark : icSecurityLight,   label: '권한 관리',          type: 'arrow'  },
-    { id: 'alarm',    img: isDark ? icAlarmDark    : icAlarmLight,      label: '알림설정',           type: 'arrow'  },
-    { id: 'data',     img: isDark ? icDataDark     : icDataLight,       label: '데이터 보관 설정',   type: 'arrow'  },
+    { id: 'alarm',    img: isDark ? icAlarmDark    : icAlarmLight,      label: '알림 설정',          type: 'arrow', to: '/notifications' },
+    { id: 'data',     img: isDark ? icDataDark     : icDataLight,       label: '데이터 보관 설정',   type: 'arrow', to: '/data' },
   ]
 
   return (
