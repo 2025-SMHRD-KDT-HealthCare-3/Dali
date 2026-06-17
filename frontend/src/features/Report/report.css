@@ -65,7 +65,10 @@
 
 /* ── 헤더 ── */
 
-.rp-header { padding-top: 20px; }
+.rp-header {
+  padding-top: 20px;
+  text-align: center;
+}
 
 .rp-title {
   font-size: 22px;
@@ -168,6 +171,35 @@
   gap: 16px;
 }
 
+/* ── AI 한마디 ── */
+
+.rp-ai-review-card {
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 10px;
+  background: rgba(179, 155, 255, 0.08);
+}
+
+.rp-ai-review-icon {
+  font-size: 16px;
+  line-height: 1.2;
+}
+
+.rp-ai-review-text {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.85);
+  line-height: 1.5;
+  margin: 0;
+  word-break: keep-all;
+}
+
+.rp-ai-review-text strong {
+  display: block;
+  font-size: 11px;
+  color: #B39BFF;
+  margin-bottom: 4px;
+}
+
 /* 세션 헤더 */
 .rp-session-hdr {
   display: flex;
@@ -197,55 +229,59 @@
   color: rgba(255, 255, 255, 0.6);
 }
 
-/* 점수 배지 */
-.rp-score-badge {
-  font-size: 12px;
-  font-weight: 700;
-  padding: 3px 10px;
-  border-radius: 999px;
-  white-space: nowrap;
-}
-.rp-score-badge.up      { background: rgba(91,196,121,0.18);  color: #5BC479; border: 1px solid rgba(91,196,121,0.3); }
-.rp-score-badge.down    { background: rgba(232,92,92,0.18);   color: #E85C5C; border: 1px solid rgba(232,92,92,0.3); }
-.rp-score-badge.neutral { background: rgba(179,155,255,0.1);  color: rgba(255,255,255,0.5); border: 1px solid rgba(179,155,255,0.18); }
+/* ── 감정 비교 (수학 함수형 물결 그래프) ── */
 
-/* 감정 비교 */
-.rp-emotion-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.rp-emotion-badge {
-  flex: 1;
+.rp-math-compare {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 16px;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  padding: 12px 8px;
-  border-radius: 16px;
-  border: 1px solid;
-  backdrop-filter: blur(6px);
+  margin: 4px 0 8px;
 }
 
-.rp-badge-lbl {
+.rp-math-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.rp-math-item {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+.rp-math-item.right {
+  align-items: flex-end;
+}
+
+.rp-math-lbl {
   font-size: 11px;
   color: rgba(255, 255, 255, 0.48);
   font-weight: 500;
+  margin-bottom: 2px;
 }
 
-.rp-badge-emoji { font-size: 26px; line-height: 1; }
-
-.rp-badge-name {
-  font-size: 14px;
+.rp-math-val {
+  font-size: 15px;
   font-weight: 700;
 }
 
-.rp-vs {
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.28);
-  font-weight: 500;
-  flex-shrink: 0;
+.rp-math-graph {
+  flex: 1;
+  height: 38px;
+  overflow: hidden;
+  display: flex;
+  align-items: flex-end;
+  margin-top: 10px;
+}
+
+.rp-math-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
 }
 
 /* ── 공용 바 섹션 ── */
@@ -285,6 +321,12 @@
 .rp-mission-pct {
   font-size: 13px;
   font-weight: 700;
+}
+
+.rp-mission-desc {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.38);
+  margin: 4px 0 0;
 }
 
 /* ── 공용 범례 ── */
@@ -456,6 +498,18 @@
   font-weight: 700;
   color: #fff;
   margin: 0;
+}
+
+.rp-trend-graph {
+  height: 140px;
+  width: 100%;
+  margin-top: 4px;
+}
+
+.rp-trend-graph svg {
+  width: 100%;
+  height: 100%;
+  display: block;
 }
 
 /* 주간 세로 막대 */
@@ -674,17 +728,31 @@
   border-color: rgba(33, 20, 107, 0.1);
 }
 [data-theme="light"] .rp-session-num  { color: #7B5FEF; }
+
+[data-theme="light"] .rp-ai-review-card {
+  background: rgba(123, 95, 239, 0.08);
+}
+[data-theme="light"] .rp-ai-review-text {
+  color: rgba(33, 20, 107, 0.85);
+}
+[data-theme="light"] .rp-ai-review-text strong {
+  color: #7B5FEF;
+}
 [data-theme="light"] .rp-session-time { color: rgba(33, 20, 107, 0.5); }
 [data-theme="light"] .rp-session-dur  {
   background: rgba(123, 95, 239, 0.1);
   border-color: rgba(123, 95, 239, 0.2);
   color: rgba(33, 20, 107, 0.6);
 }
-[data-theme="light"] .rp-badge-lbl  { color: rgba(33, 20, 107, 0.48); }
-[data-theme="light"] .rp-vs         { color: rgba(33, 20, 107, 0.28); }
+[data-theme="light"] .rp-math-compare {
+  background: rgba(33, 20, 107, 0.02);
+  border-color: rgba(33, 20, 107, 0.06);
+}
+[data-theme="light"] .rp-math-lbl { color: rgba(33, 20, 107, 0.48); }
 [data-theme="light"] .rp-bar-label  { color: rgba(33, 20, 107, 0.48); }
 [data-theme="light"] .rp-bar        { background: rgba(33, 20, 107, 0.07); }
 [data-theme="light"] .rp-legend-item{ color: rgba(33, 20, 107, 0.6); }
+[data-theme="light"] .rp-mission-desc { color: rgba(33, 20, 107, 0.4); }
 
 [data-theme="light"] .rp-cal-card {
   background: rgba(255, 255, 255, 0.75);
