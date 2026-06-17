@@ -11,6 +11,23 @@ export function AuthProvider({ children }) {
   const [authLoading, setAuthLoading] = useState(true)
 
   useEffect(() => {
+    // 네이버/카카오 리다이렉트 콜백 시 단기 쿠키로 access_token 전달됨 (httpOnly: false, 30초)
+    const snsCookie = document.cookie.split(';')
+      .map(c => c.trim())
+      .find(c => c.startsWith('sns_access_token='))
+
+    if (snsCookie) {
+      const snsToken = snsCookie.split('=').slice(1).join('=')
+      document.cookie = 'sns_access_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;'
+      setAccessToken(snsToken)
+      setIsAuthenticated(true)
+      userApi.getMe()
+        .then(res => { if (res.user) setUser(res.user) })
+        .catch(() => {})
+        .finally(() => setAuthLoading(false))
+      return
+    }
+
     authApi.refresh()
       .then(async res => {
         if (res.access_token) {

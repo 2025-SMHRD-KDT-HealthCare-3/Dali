@@ -34,6 +34,10 @@ const EyeIcon = ({ visible }) => visible ? (
   </svg>
 )
 
+// 소셜 로그인은 Vite proxy 우회해서 백엔드 직접 호출 (Docker/로컬 모두 localhost:3000)
+const SOCIAL_BASE = import.meta.env.VITE_SOCIAL_BASE || import.meta.env.VITE_API_URL || ''
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID
+
 const Login = () => {
   const navigate = useNavigate()
   const { login } = useAuth()
@@ -100,23 +104,49 @@ const Login = () => {
       <div className="auth-divider"><span>또는</span></div>
 
       <div className="social-list">
-        <button type="button" className="btn-social" onClick={() => {}}>
-          <span className="social-badge google-badge">
-            <img src={googleImg} alt="Google" />
-          </span>
-          <span className="social-label">Google로 계속하기</span>
-        </button>
-        <button type="button" className="btn-social" onClick={() => {}}>
+        <button type="button" className="btn-social" onClick={() => {
+          window.location.href = `${SOCIAL_BASE}/api/auth/naver`
+        }}>
           <span className="social-badge">
             <img src={naverImg} alt="Naver" />
           </span>
           <span className="social-label">Naver로 계속하기</span>
         </button>
-        <button type="button" className="btn-social" onClick={() => {}}>
+        <button type="button" className="btn-social" onClick={() => {
+          window.location.href = `${SOCIAL_BASE}/api/auth/kakao`
+        }}>
           <span className="social-badge">
             <img src={kakaoImg} alt="Kakao" />
           </span>
           <span className="social-label">Kakao로 계속하기</span>
+        </button>
+        <button type="button" className="btn-social" onClick={() => {
+          if (!GOOGLE_CLIENT_ID || !window.google) {
+            setError('Google 로그인을 사용할 수 없습니다.')
+            return
+          }
+          window.google.accounts.oauth2.initTokenClient({
+            client_id: GOOGLE_CLIENT_ID,
+            scope: 'openid email profile',
+            callback: async (tokenResponse) => {
+              if (!tokenResponse.access_token) return
+              setLoading(true)
+              try {
+                const res = await authApi.googleLogin({ access_token: tokenResponse.access_token })
+                login(res.access_token, res.user)
+                navigate(res.user?.onboarding_completed ? '/main' : '/onboarding')
+              } catch (err) {
+                setError(err.message || 'Google 로그인에 실패했습니다.')
+              } finally {
+                setLoading(false)
+              }
+            },
+          }).requestAccessToken()
+        }}>
+          <span className="social-badge google-badge">
+            <img src={googleImg} alt="Google" />
+          </span>
+          <span className="social-label">Google로 계속하기</span>
         </button>
       </div>
 
