@@ -20,7 +20,7 @@ async function findByUserId(user_id, page = 1, limit = 20) {
     [user_id]
   );
   const [rows] = await pool.query(
-    'SELECT * FROM emotion_alerts WHERE user_id = ? ORDER BY alerts_at DESC LIMIT ? OFFSET ?',
+    'SELECT * FROM emotion_alerts WHERE user_id = ? ORDER BY alerted_at DESC LIMIT ? OFFSET ?',
     [user_id, limit, offset]
   );
   return { total, rows };
@@ -33,10 +33,10 @@ async function confirmAlert(e_alert_id, user_id) {
   );
 }
 
-async function createAlert({ user_id, alerts_emotion, alerts_reason }) {
+async function createAlert({ user_id, alerted_emotion, alert_reason }) {
   const [result] = await pool.query(
-    'INSERT INTO emotion_alerts (user_id, alerts_emotion, alerts_reason) VALUES (?, ?, ?)',
-    [user_id, alerts_emotion, alerts_reason]
+    'INSERT INTO emotion_alerts (user_id, alerted_emotion, alert_reason) VALUES (?, ?, ?)',
+    [user_id, alerted_emotion, alert_reason]
   );
   return result.insertId;
 }
