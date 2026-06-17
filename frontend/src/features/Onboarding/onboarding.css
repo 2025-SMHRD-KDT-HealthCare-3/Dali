@@ -255,3 +255,80 @@
 [data-theme="light"] .ob-date-input { color-scheme: light; }
 
 [data-theme="light"] .ob-loading { color: rgba(33, 20, 107, 0.55); }
+
+/* ── 페르소나 선택 단계 ── */
+.ob-persona-area {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 16px 16px;
+  max-height: 56vh;
+  overflow-y: auto;
+}
+.ob-persona-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ob-persona-btn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background: rgba(155, 126, 255, 0.08);
+  border: 1.5px solid rgba(155, 126, 255, 0.2);
+  border-radius: 14px;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.18s, border-color 0.18s;
+  position: relative;
+}
+.ob-persona-btn.selected {
+  background: rgba(155, 126, 255, 0.2);
+  border-color: #9B7EFF;
+}
+.ob-persona-btn.recommended {
+  border-color: #C8A8FF;
+}
+.ob-persona-emoji { font-size: 22px; flex-shrink: 0; }
+.ob-persona-text  { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+.ob-persona-name  { font-size: 14px; font-weight: 600; color: #E8E0FF; }
+.ob-persona-desc  { font-size: 12px; color: rgba(232, 224, 255, 0.6); }
+.ob-persona-tag {
+  font-size: 10px;
+  font-weight: 700;
+  color: #9B7EFF;
+  background: rgba(155, 126, 255, 0.18);
+  border-radius: 6px;
+  padding: 2px 7px;
+  flex-shrink: 0;
+}
+.ob-persona-check {
+  font-size: 16px;
+  color: #9B7EFF;
+  flex-shrink: 0;
+}
+.ob-persona-confirm {
+  margin-top: 4px;
+  padding: 13px;
+  background: linear-gradient(135deg, #7B5FEF, #9B7EFF);
+  border: none;
+  border-radius: 14px;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.18s;
+}
+.ob-persona-confirm:hover { opacity: 0.88; }
+
+[data-theme="light"] .ob-persona-btn {
+  background: rgba(123, 95, 239, 0.06);
+  border-color: rgba(123, 95, 239, 0.18);
+}
+[data-theme="light"] .ob-persona-btn.selected {
+  background: rgba(123, 95, 239, 0.14);
+  border-color: #7B5FEF;
+}
+[data-theme="light"] .ob-persona-name { color: #21146B; }
+[data-theme="light"] .ob-persona-desc { color: rgba(33, 20, 107, 0.55); }

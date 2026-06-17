@@ -34,7 +34,12 @@ const COACHING_OPTS = [
   '따뜻한 위로를 받고 싶어요',
 ]
 
-const TIME_OPTS = ['아침', '낮', '저녁', '밤']
+const EMOTION_STATE_OPTS = [
+  '생각이 많고 복잡해요',
+  '마음이 조금 지쳐있어요',
+  '아무것도 하기 싫어요',
+  '편하게 이야기하고 싶어요',
+]
 
 // 백엔드 persona 값 기준
 const PERSONAS = [
@@ -46,7 +51,8 @@ const PERSONAS = [
 
 // 온보딩 질문 정의 (백엔드 전송용)
 const OB_DEFS = [
-  { question_no: 2, question: '요즘 하루 에너지 수준은 어떤가요?',        key: 'energy',        opts: ENERGY_OPTS },
+  { question_no: 1, question: '요즘 당신의 마음은 어떤가요?',             key: 'emotionState',  opts: EMOTION_STATE_OPTS },
+  { question_no: 2, question: '요즘 하루 에너지 수준은 어떤가요?',         key: 'energy',        opts: ENERGY_OPTS },
   { question_no: 3, question: '최근 가장 신경 쓰이는 영역은 무엇인가요?',  key: 'topic',         opts: TOPIC_OPTS },
   { question_no: 4, question: '달리와 어떤 시간을 보내고 싶나요?',         key: 'coachingStyle', opts: COACHING_OPTS },
 ]
@@ -87,10 +93,10 @@ const Info = () => {
   const [pwMsg,     setPwMsg]     = useState('')
 
   // 온보딩 정보
+  const [emotionState,  setEmotionState]  = useState('')
   const [energy,        setEnergy]        = useState('')
   const [topic,         setTopic]         = useState('')
   const [coachingStyle, setCoachingStyle] = useState('')
-  const [checkinTime,   setCheckinTime]   = useState('')
 
   // 페르소나
   const [persona, setPersona] = useState('')
@@ -107,24 +113,24 @@ const Info = () => {
           const u = meRes.user
           setNickname(u.nick_name  || '')
           setGender(GENDER_FROM_DB[u.gender] || '')
-          setBirthdate(u.birth_date || '')
+          setBirthdate(u.birth_date ? u.birth_date.split('T')[0] : '')
           setPersona(u.persona     || '')
         }
       } catch {
         setError('사용자 정보를 불러오는 데 실패했습니다.')
       }
 
-      // 온보딩 답변 로드 (백엔드 B-4 GET /onboarding 구현 후 동작)
+      // 온보딩 답변 로드
       try {
         const obRes = await onboardingApi.getAnswers()
-        if (Array.isArray(obRes)) {
-          obRes.forEach(({ question_no, user_answer }) => {
-            const idx = user_answer - 1
-            if (question_no === 2 && ENERGY_OPTS[idx])   setEnergy(ENERGY_OPTS[idx])
-            if (question_no === 3 && TOPIC_OPTS[idx])    setTopic(TOPIC_OPTS[idx])
-            if (question_no === 4 && COACHING_OPTS[idx]) setCoachingStyle(COACHING_OPTS[idx])
-          })
-        }
+        const list = Array.isArray(obRes?.onboarding) ? obRes.onboarding : []
+        list.forEach(({ question_no, user_answer }) => {
+          const idx = user_answer - 1
+          if (question_no === 1 && EMOTION_STATE_OPTS[idx]) setEmotionState(EMOTION_STATE_OPTS[idx])
+          if (question_no === 2 && ENERGY_OPTS[idx])        setEnergy(ENERGY_OPTS[idx])
+          if (question_no === 3 && TOPIC_OPTS[idx])         setTopic(TOPIC_OPTS[idx])
+          if (question_no === 4 && COACHING_OPTS[idx])      setCoachingStyle(COACHING_OPTS[idx])
+        })
       } catch {}
 
       setPageLoading(false)
@@ -137,13 +143,18 @@ const Info = () => {
     setError('')
     setSuccess('')
     try {
-      // 기본 정보 저장
-      const genderVal = GENDER_TO_DB[gender] || user?.gender || ''
-      await userApi.updateMe({
-        nick_name:  nickname  || user?.nick_name  || '',
-        gender:     genderVal,
-        birth_date: birthdate || user?.birth_date || '',
-      })
+      // 기본 정보 저장 — 값이 있는 필드만 전송 (빈 문자열은 백엔드 validation 실패)
+      const genderVal = GENDER_TO_DB[gender] || user?.gender || null
+      const updatePayload = {}
+      if (nickname  || user?.nick_name)  updatePayload.nick_name  = nickname  || user.nick_name
+      if (genderVal) updatePayload.gender = genderVal
+      const cleanBirth = birthdate
+        ? birthdate.split('T')[0]
+        : user?.birth_date ? user.birth_date.split('T')[0] : null
+      if (cleanBirth) updatePayload.birth_date = cleanBirth
+      if (Object.keys(updatePayload).length > 0) {
+        await userApi.updateMe(updatePayload)
+      }
 
       // 페르소나 저장
       if (persona && persona !== user?.persona) {
@@ -151,7 +162,7 @@ const Info = () => {
       }
 
       // 온보딩 답변 저장 (백엔드 B-3 upsert 구현 후 정상 동작)
-      const obValues = { energy, topic, coachingStyle }
+      const obValues = { emotionState, energy, topic, coachingStyle }
       for (const def of OB_DEFS) {
         const val = obValues[def.key]
         if (!val) continue
@@ -176,7 +187,7 @@ const Info = () => {
         ...prev,
         nick_name:  nickname  || prev?.nick_name,
         gender:     genderVal || prev?.gender,
-        birth_date: birthdate || prev?.birth_date,
+        birth_date: cleanBirth || prev?.birth_date,
         persona:    persona   || prev?.persona,
       }))
 
@@ -307,6 +318,15 @@ const Info = () => {
           <h2 className="info-sec-title">온보딩 정보</h2>
 
           <div className="info-field">
+            <label className="info-label">요즘 당신의 마음</label>
+            <div className="info-chips info-chips--col">
+              {EMOTION_STATE_OPTS.map(opt => (
+                <button key={opt} className={`info-chip${emotionState === opt ? ' active' : ''}`} onClick={() => setEmotionState(opt)}>{opt}</button>
+              ))}
+            </div>
+          </div>
+
+          <div className="info-field">
             <label className="info-label">하루 에너지 수준</label>
             <div className="info-chips info-chips--col">
               {ENERGY_OPTS.map(opt => (
@@ -333,14 +353,6 @@ const Info = () => {
             </div>
           </div>
 
-          <div className="info-field">
-            <label className="info-label">체크인 시간대</label>
-            <div className="info-chips">
-              {TIME_OPTS.map(opt => (
-                <button key={opt} className={`info-chip${checkinTime === opt ? ' active' : ''}`} onClick={() => setCheckinTime(opt)}>{opt}</button>
-              ))}
-            </div>
-          </div>
         </section>
 
         {/* ── 달리 페르소나 ── */}
@@ -373,6 +385,16 @@ const Info = () => {
         <button className="info-save-btn" onClick={handleSave} disabled={saving}>
           {saving ? '저장 중...' : '저장하기'}
         </button>
+
+        {/* ── 로그아웃 ── */}
+        <section className="info-section info-section--withdraw">
+          <button
+            className="info-logout-btn"
+            onClick={async () => { await logout(); navigate('/') }}
+          >
+            로그아웃
+          </button>
+        </section>
 
         {/* ── 회원탈퇴 ── */}
         <section className="info-section info-section--withdraw">

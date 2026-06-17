@@ -1,0 +1,260 @@
+/* ══════════════════════════════════════════════
+   DataManagement Screen — 데이터 보관 설정
+══════════════════════════════════════════════ */
+
+.dm-screen {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  overflow-x: hidden;
+  overflow-y: auto;
+  background: var(--bg-screen);
+  font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+/* ── 배경 별 ── */
+.dm-bg {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+.dm-star {
+  position: absolute;
+  color: #f6e39a;
+  pointer-events: none;
+  animation: dm-twinkle 3.5s ease-in-out infinite;
+}
+@keyframes dm-twinkle {
+  0%, 100% { opacity: 0.18; transform: scale(0.8); }
+  50%       { opacity: 0.82; transform: scale(1.2); }
+}
+.dm-star.ds1 { top:  8%; left:  12%; font-size: 12px; animation-delay: 0s;   }
+.dm-star.ds2 { top: 20%; right: 18%; font-size:  7px; animation-delay: 1.2s; }
+.dm-star.ds3 { top: 55%; left:   8%; font-size:  9px; animation-delay: 0.7s; }
+.dm-star.ds4 { top: 72%; right: 10%; font-size: 11px; animation-delay: 2s;   }
+
+.dm-theme-toggle {
+  position: fixed;
+  top: 18px;
+  right: 18px;
+  z-index: 100;
+}
+
+/* ── 내부 레이아웃 ── */
+.dm-inner {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 20px 20px 40px;
+  max-width: 480px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+/* ── 헤더 ── */
+.dm-header {
+  display: flex;
+  align-items: center;
+  padding: 8px 0 4px;
+}
+.dm-back {
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  font-size: 26px;
+  cursor: pointer;
+  padding: 4px 10px 4px 0;
+  line-height: 1;
+}
+.dm-title {
+  flex: 1;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+  text-align: center;
+  margin: 0;
+}
+.dm-header-end { width: 34px; }
+
+/* ── 안내 카드 ── */
+.dm-info-card {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  background: rgba(155, 126, 255, 0.1);
+  border: 1.5px solid rgba(155, 126, 255, 0.22);
+  border-radius: 16px;
+  padding: 16px;
+}
+.dm-info-emoji { font-size: 24px; flex-shrink: 0; margin-top: 2px; }
+.dm-info-text  {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+}
+
+/* ── 섹션 타이틀 ── */
+.dm-section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin: 0;
+  padding-left: 2px;
+}
+
+/* ── 삭제 대상 목록 ── */
+.dm-data-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.dm-data-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 14px 16px;
+}
+.dm-data-emoji { font-size: 20px; flex-shrink: 0; }
+.dm-data-text  { display: flex; flex-direction: column; gap: 2px; }
+.dm-data-label { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+.dm-data-desc  { font-size: 12px; color: var(--text-secondary); }
+
+/* ── 삭제 버튼 ── */
+.dm-delete-btn {
+  padding: 15px;
+  background: rgba(232, 92, 92, 0.15);
+  border: 1.5px solid rgba(232, 92, 92, 0.4);
+  border-radius: 14px;
+  color: #E85C5C;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.18s, border-color 0.18s;
+}
+.dm-delete-btn:hover {
+  background: rgba(232, 92, 92, 0.25);
+  border-color: rgba(232, 92, 92, 0.6);
+}
+
+/* ── 확인 박스 ── */
+.dm-confirm-box {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  background: rgba(232, 92, 92, 0.08);
+  border: 1.5px solid rgba(232, 92, 92, 0.25);
+  border-radius: 16px;
+  padding: 20px;
+}
+.dm-confirm-msg {
+  font-size: 14px;
+  color: var(--text-primary);
+  line-height: 1.6;
+  text-align: center;
+  margin: 0;
+}
+.dm-confirm-warn {
+  font-size: 12px;
+  color: #E85C5C;
+  font-weight: 600;
+}
+.dm-confirm-btns {
+  display: flex;
+  gap: 10px;
+}
+.dm-cancel-btn {
+  flex: 1;
+  padding: 13px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.18s;
+}
+.dm-cancel-btn:hover { background: rgba(255, 255, 255, 0.1); }
+.dm-confirm-del-btn {
+  flex: 1;
+  padding: 13px;
+  background: #E85C5C;
+  border: none;
+  border-radius: 12px;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.18s;
+}
+.dm-confirm-del-btn:hover { opacity: 0.85; }
+
+/* ── 상태 (로딩 / 완료 / 에러) ── */
+.dm-status {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 24px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.dm-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid rgba(155, 126, 255, 0.2);
+  border-top-color: #9B7EFF;
+  border-radius: 50%;
+  animation: dm-spin 0.8s linear infinite;
+}
+@keyframes dm-spin { to { transform: rotate(360deg); } }
+
+.dm-status-text {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin: 0;
+  text-align: center;
+}
+.dm-done-icon {
+  font-size: 32px;
+  color: #5BC479;
+}
+.dm-status--done { border-color: rgba(91, 196, 121, 0.25); }
+.dm-status--error { border-color: rgba(232, 92, 92, 0.25); }
+.dm-error-text {
+  font-size: 13px;
+  color: #E85C5C;
+  margin: 0;
+  text-align: center;
+}
+.dm-back-btn {
+  padding: 11px 28px;
+  background: rgba(91, 196, 121, 0.15);
+  border: 1.5px solid rgba(91, 196, 121, 0.35);
+  border-radius: 12px;
+  color: #5BC479;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.18s;
+}
+.dm-back-btn:hover { background: rgba(91, 196, 121, 0.25); }
+
+/* ── 라이트 모드 ── */
+[data-theme="light"] .dm-data-item {
+  background: rgba(255, 255, 255, 0.7);
+  border-color: rgba(123, 95, 239, 0.12);
+}
+[data-theme="light"] .dm-status {
+  background: rgba(255, 255, 255, 0.7);
+  border-color: rgba(123, 95, 239, 0.12);
+}

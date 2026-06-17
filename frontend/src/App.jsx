@@ -11,7 +11,9 @@ import Settings   from './features/Settings/Settings'
 import Mission    from './features/Mission/Mission'
 import Report     from './features/Report/Report'
 import Onboarding from './features/Onboarding/Onboarding'
-import Info       from './features/Info/Info'
+import Info           from './features/Info/Info'
+import DataManagement       from './features/DataManagement/DataManagement'
+import NotificationSettings from './features/NotificationSettings/NotificationSettings'
 
 const FOOTER_PATHS = ['/main', '/report', '/mission', '/settings']
 
@@ -56,6 +58,8 @@ function App() {
           <Route path="/settings"   element={<ProtectedRoute><Settings /></ProtectedRoute>} />
           <Route path="/mission"    element={<ProtectedRoute><Mission /></ProtectedRoute>} />
           <Route path="/report"     element={<ProtectedRoute><Report /></ProtectedRoute>} />
+          <Route path="/data"          element={<ProtectedRoute><DataManagement /></ProtectedRoute>} />
+          <Route path="/notifications" element={<ProtectedRoute><NotificationSettings /></ProtectedRoute>} />
           <Route path="*"           element={<Navigate to="/" replace />} />
         </Routes>
         {showFooter && <Footer />}

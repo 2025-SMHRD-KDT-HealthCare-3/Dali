@@ -27,12 +27,14 @@
  * [세션]
  * - POST   /api/sessions                          감정 선택 및 세션 시작
  * - GET    /api/sessions                          내 세션 목록 조회
+ * - DELETE /api/sessions                          데이터 초기화 (개인정보 제외 전체 삭제)
  * - GET    /api/sessions/:id                      세션 상세 조회 (소유자 검증)
  * - PATCH  /api/sessions/:id/end                  세션 종료
  * - GET    /api/sessions/:id/messages             세션 대화 히스토리 조회
  *
  * [챗봇]
  * - POST   /api/chat                              사용자 메시지 전송 및 AI 응답 생성
+ * - POST   /api/chat/audio                        음성 파일 → STT 변환 → AI 응답 생성
  *
  * [발화별 감정 분석]
  * - GET    /api/log-analyses?session_id=X         세션의 발화별 분석 목록
@@ -113,12 +115,14 @@ router.post('/onboarding', optionalLogin, onboardingCtrl.saveOnboarding);
 // 세션 (감정 선택) - 회원 전용
 router.post('/sessions', requireLogin, sessionCtrl.startSession);
 router.get('/sessions', requireLogin, sessionCtrl.getSessions);
+router.delete('/sessions', requireLogin, sessionCtrl.resetSessions);
 router.get('/sessions/:id', requireLogin, sessionCtrl.getSessionById);
 router.patch('/sessions/:id/end', requireLogin, sessionCtrl.endSession);
 router.get('/sessions/:id/messages', requireLogin, sessionCtrl.getSessionMessages);
 
 // 챗봇 대화
 router.post('/chat', optionalLogin, chatCtrl.chat);
+router.post('/chat/audio', optionalLogin, chatCtrl.upload.single('audio'), chatCtrl.chatAudio);
 
 // 발화별 감정 분석
 router.get('/log-analyses', requireLogin, logAnalysisCtrl.getLogAnalysesBySession);

@@ -449,6 +449,31 @@
   padding-top: 24px;
   border-top: 1px solid rgba(255,255,255,0.08);
 }
+.info-logout-btn {
+  width: 100%;
+  padding: 12px;
+  background: none;
+  border: 1.5px solid rgba(155, 126, 255, 0.35);
+  border-radius: 12px;
+  color: rgba(200, 180, 255, 0.85);
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.info-logout-btn:hover {
+  background: rgba(155, 126, 255, 0.1);
+  border-color: rgba(155, 126, 255, 0.65);
+  color: #c8b4ff;
+}
+[data-theme="light"] .info-logout-btn {
+  border-color: rgba(123, 95, 239, 0.3);
+  color: rgba(123, 95, 239, 0.8);
+}
+[data-theme="light"] .info-logout-btn:hover {
+  background: rgba(123, 95, 239, 0.08);
+  border-color: #7B5FEF;
+  color: #7B5FEF;
+}
 .info-withdraw-btn {
   width: 100%;
   padding: 12px;
