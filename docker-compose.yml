@@ -7,6 +7,8 @@ services:
     volumes:
       - ./frontend:/app
       - /app/node_modules
+    env_file:
+      - .env
     depends_on:
       node:
         condition: service_healthy        # node가 "준비"될 때까지 대기

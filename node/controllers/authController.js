@@ -135,9 +135,8 @@ async function signup(req, res) {
   const emailErr = validateEmail(email);
   if (emailErr) return res.status(400).json({ code: 'INVALID_REQUEST', message: emailErr });
 
-  if (!pwd) return res.status(400).json({ code: 'INVALID_REQUEST', message: '비밀번호를 입력해주세요.' });
-  // const pwdErr = validatePassword(pwd);
-  // if (pwdErr) return res.status(400).json({ code: 'INVALID_REQUEST', message: pwdErr });
+  const pwdErr = validatePassword(pwd);
+  if (pwdErr) return res.status(400).json({ code: 'INVALID_REQUEST', message: pwdErr });
 
   const fieldErr = validateUserFields({ nick_name, gender, birth_date });
   if (fieldErr) return res.status(400).json({ code: 'INVALID_REQUEST', message: fieldErr });
