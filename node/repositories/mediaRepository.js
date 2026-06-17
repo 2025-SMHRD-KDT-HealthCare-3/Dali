@@ -8,6 +8,7 @@ const pool = require('../config/db');
 
 async function findByType(media_type, emotion) {
   if (emotion) {
+    // 감정별 필터 — media_emotions 테이블과 JOIN, 랜덤 3개 추천
     const [rows] = await pool.query(
       `SELECT mc.*
        FROM media_contents mc
@@ -20,6 +21,7 @@ async function findByType(media_type, emotion) {
     return rows;
   }
 
+  // 감정 없으면 전체 목록 반환 (최신순)
   const [rows] = await pool.query(
     'SELECT * FROM media_contents WHERE media_type = ? ORDER BY created_at DESC',
     [media_type]

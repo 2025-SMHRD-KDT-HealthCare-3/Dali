@@ -4,7 +4,7 @@
  * - endSession            : 세션 종료 (ended_at 업데이트)
  * - findSessionsByUser    : 사용자의 세션 목록 조회 (페이지네이션)
  * - findSessionById       : 세션 단건 조회
- * - findMessagesBySession : 세션의 대화 히스토리 조회 (emotion_logs + log_analyses)
+ * - findMessagesBySession : 세션의 대화 히스토리 조회 (emotion_logs + log_analyses JOIN)
  * - checkConsecutiveDays  : 특정 감정이 N일 연속인지 확인
  */
 
@@ -43,6 +43,7 @@ async function findSessionById(session_id) {
   return rows[0];
 }
 
+// emotion_logs(발화)와 log_analyses(감정 점수)를 JOIN해서 대화 히스토리 반환
 async function findMessagesBySession(session_id) {
   const [rows] = await pool.query(
     `SELECT el.log_id, el.utterance, el.turn_idx, el.spoken_at,
@@ -56,7 +57,8 @@ async function findMessagesBySession(session_id) {
   return rows;
 }
 
-// 오늘 포함 최근 N일간 session_analyses.dominant_emotion이 동일한지 확인
+// 오늘 포함 최근 N일간 dominant_emotion이 동일한 날이 N일 이상인지 확인
+// 5일 연속 같은 감정이면 감정 주의 신호 생성 트리거
 async function checkConsecutiveDays(user_id, emotion, days = 5) {
   const [rows] = await pool.query(
     `SELECT COUNT(DISTINCT DATE(sa.created_at)) AS cnt

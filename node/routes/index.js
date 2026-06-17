@@ -9,10 +9,10 @@
  * - POST   /api/auth/refresh                      액세스 토큰 재발급 (리프레시 쿠키 사용)
  * - POST   /api/auth/password/reset-request       비밀번호 재설정 요청 (이메일 발송)
  * - POST   /api/auth/password/reset               비밀번호 재설정
- * - POST   /api/auth/kakao                        카카오 소셜 로그인
- * - POST   /api/auth/naver                        네이버 소셜 로그인
- * - POST   /api/auth/google                       구글 소셜 로그인
- * - POST   /api/auth/sns/register                 SNS 신규 유저 추가 정보 등록
+ * - GET    /api/auth/kakao                        카카오 로그인 리다이렉트 (브라우저 이동)
+ * - GET    /api/auth/kakao/callback               카카오 OAuth 콜백 처리
+ * - GET    /api/auth/naver                        네이버 로그인 리다이렉트 (브라우저 이동)
+ * - GET    /api/auth/naver/callback               네이버 OAuth 콜백 처리
  *
  * [회원]
  * - GET    /api/users/me                          회원정보 조회 (onboarding_completed 포함)
@@ -21,7 +21,8 @@
  * - DELETE /api/users/me                          회원탈퇴
  *
  * [온보딩]
- * - POST   /api/onboarding                        초기 설문 저장
+ * - POST   /api/onboarding                        초기 설문 저장/수정 (upsert)
+ * - GET    /api/onboarding/me                     내 온보딩 답변 조회
  *
  * [세션]
  * - POST   /api/sessions                          감정 선택 및 세션 시작
@@ -93,10 +94,11 @@ router.post('/auth/refresh', authCtrl.refresh);
 router.post('/auth/password/reset-request', authLimiter, authCtrl.passwordResetRequest);
 router.post('/auth/password/reset', authLimiter, authCtrl.passwordReset);
 
-router.post('/auth/kakao', authCtrl.kakaoAuth);
-router.post('/auth/naver', authCtrl.naverAuth);
+router.get('/auth/kakao', authCtrl.kakaoLoginRedirect);           // 카카오 로그인 페이지로 리다이렉트
+router.get('/auth/kakao/callback', authCtrl.kakaoAuth);            // 카카오 인가 코드 수신 후 처리
+router.get('/auth/naver', authCtrl.naverLoginRedirect);            // 네이버 로그인 페이지로 리다이렉트
+router.get('/auth/naver/callback', authCtrl.naverAuth);            // 네이버 인가 코드 수신 후 처리
 router.post('/auth/google', authCtrl.googleAuth);
-router.post('/auth/sns/register', authCtrl.snsRegister);
 
 // 회원
 router.get('/users/me', requireLogin, authCtrl.getMe);
@@ -105,6 +107,7 @@ router.patch('/users/me/persona', requireLogin, authCtrl.updatePersona);
 router.delete('/users/me', requireLogin, authCtrl.deleteMe);
 
 // 온보딩
+router.get('/onboarding/me', requireLogin, onboardingCtrl.getMyOnboarding);
 router.post('/onboarding', optionalLogin, onboardingCtrl.saveOnboarding);
 
 // 세션 (감정 선택) - 회원 전용

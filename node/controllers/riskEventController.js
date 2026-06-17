@@ -7,10 +7,13 @@
 const riskEventRepo = require('../repositories/riskEventRepository');
 const sessionRepo = require('../repositories/sessionRepository');
 
+// 고위험 신호 목록 조회
+// chatController에서 FastAPI가 is_risk: true 반환 시 자동 저장됨
 async function getRiskEvents(req, res) {
   const { session_id } = req.query;
 
   if (session_id) {
+    // 세션 존재 여부 + 소유자 검증
     const session = await sessionRepo.findSessionById(session_id);
     if (!session) return res.status(404).json({ code: 'NOT_FOUND', message: '세션을 찾을 수 없습니다.' });
     if (session.user_id !== req.user.user_id) {
@@ -20,6 +23,7 @@ async function getRiskEvents(req, res) {
     return res.json({ risk_events: events });
   }
 
+  // session_id 없으면 내 전체 고위험 신호 반환
   const events = await riskEventRepo.findByUserId(req.user.user_id);
   res.json({ risk_events: events });
 }

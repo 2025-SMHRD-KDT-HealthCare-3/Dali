@@ -394,3 +394,123 @@
 [data-theme="light"] .info-persona-name  { color: #21146B; }
 [data-theme="light"] .info-persona-desc  { color: rgba(33, 20, 107, 0.48); }
 [data-theme="light"] .info-persona-check { color: #7B5FEF; }
+
+/* ── 추가 클래스 ── */
+
+.info-loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+  color: var(--text-secondary, rgba(255,255,255,0.5));
+  font-size: 14px;
+}
+
+.info-pw-reset-btn {
+  width: 100%;
+  padding: 12px 16px;
+  border-radius: 12px;
+  border: 1.5px solid rgba(140, 99, 255, 0.4);
+  background: rgba(140, 99, 255, 0.1);
+  color: var(--text-primary, #fff);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+}
+.info-pw-reset-btn:hover:not(:disabled) {
+  background: rgba(140, 99, 255, 0.2);
+  border-color: rgba(140, 99, 255, 0.7);
+}
+.info-pw-reset-btn:disabled { opacity: 0.5; cursor: default; }
+
+.info-pw-msg {
+  margin-top: 8px;
+  font-size: 12px;
+  color: rgba(140, 99, 255, 0.9);
+}
+
+.info-error {
+  margin: 8px 0;
+  font-size: 13px;
+  color: #ff6b6b;
+  text-align: center;
+}
+.info-success {
+  margin: 8px 0;
+  font-size: 13px;
+  color: #6bffb8;
+  text-align: center;
+}
+
+/* 회원탈퇴 */
+.info-section--withdraw {
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid rgba(255,255,255,0.08);
+}
+.info-withdraw-btn {
+  width: 100%;
+  padding: 12px;
+  background: none;
+  border: 1.5px solid rgba(255, 100, 100, 0.3);
+  border-radius: 12px;
+  color: rgba(255, 100, 100, 0.7);
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.info-withdraw-btn:hover {
+  background: rgba(255, 100, 100, 0.08);
+  border-color: rgba(255, 100, 100, 0.6);
+  color: #ff6464;
+}
+.info-withdraw-confirm { text-align: center; }
+.info-withdraw-msg {
+  font-size: 13px;
+  color: rgba(255,255,255,0.65);
+  margin-bottom: 16px;
+  line-height: 1.5;
+}
+.info-withdraw-actions {
+  display: flex;
+  gap: 10px;
+}
+.info-withdraw-cancel,
+.info-withdraw-confirm-btn {
+  flex: 1;
+  padding: 11px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.info-withdraw-cancel {
+  background: rgba(255,255,255,0.08);
+  border: 1.5px solid rgba(255,255,255,0.12);
+  color: var(--text-primary, #fff);
+}
+.info-withdraw-cancel:hover { background: rgba(255,255,255,0.14); }
+.info-withdraw-confirm-btn {
+  background: rgba(255, 80, 80, 0.18);
+  border: 1.5px solid rgba(255, 80, 80, 0.4);
+  color: #ff6464;
+}
+.info-withdraw-confirm-btn:hover { background: rgba(255, 80, 80, 0.3); }
+.info-withdraw-cancel:disabled,
+.info-withdraw-confirm-btn:disabled { opacity: 0.5; cursor: default; }
+
+[data-theme="light"] .info-pw-reset-btn {
+  background: rgba(91, 63, 214, 0.07);
+  border-color: rgba(123, 95, 239, 0.35);
+  color: #21146B;
+}
+[data-theme="light"] .info-pw-msg    { color: #7B5FEF; }
+[data-theme="light"] .info-error     { color: #d63031; }
+[data-theme="light"] .info-success   { color: #00b894; }
+[data-theme="light"] .info-withdraw-btn { border-color: rgba(214, 48, 49, 0.3); color: rgba(214, 48, 49, 0.7); }
+[data-theme="light"] .info-withdraw-btn:hover { border-color: #d63031; color: #d63031; }
+[data-theme="light"] .info-withdraw-msg { color: rgba(33, 20, 107, 0.55); }
+[data-theme="light"] .info-withdraw-cancel { background: rgba(33,20,107,0.06); border-color: rgba(33,20,107,0.12); color: #21146B; }
+[data-theme="light"] .info-withdraw-confirm-btn { background: rgba(214,48,49,0.08); border-color: rgba(214,48,49,0.35); color: #d63031; }

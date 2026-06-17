@@ -14,8 +14,10 @@ const reportRepo = require('../repositories/reportRepository');
 const summaryRepo = require('../repositories/summaryRepository');
 const missionRepo = require('../repositories/missionRepository');
 
+// 감정 주의 신호를 발생시킬 감정 목록
 const ALERT_EMOTIONS = ['슬픔', '불안', '분노', '상처'];
 
+// 세션 시작 — 감정 선택 후 호출, session_id 반환
 async function startSession(req, res) {
   const { selected_emotion } = req.body;
   if (!selected_emotion) {
@@ -30,6 +32,7 @@ async function startSession(req, res) {
   res.status(201).json({ session_id: sessionId });
 }
 
+// 세션 종료 — FastAPI에 분석 요청 후 결과를 여러 테이블에 저장
 async function endSession(req, res) {
   const { id } = req.params;
   const session = await sessionRepo.findSessionById(id);
@@ -37,13 +40,16 @@ async function endSession(req, res) {
   if (!session) {
     return res.status(404).json({ code: 'NOT_FOUND', message: '세션을 찾을 수 없습니다.' });
   }
+  // 다른 사람의 세션 종료 시도 차단 (IDOR 방어)
   if (session.user_id !== req.user.user_id) {
     return res.status(403).json({ code: 'FORBIDDEN', message: '접근 권한이 없습니다.' });
   }
 
+  // DB에서 세션 ended_at 업데이트
   await sessionRepo.endSession(id);
 
-  // FastAPI: 세션 분석/요약/미션 생성 요청
+  // FastAPI에 세션 분석 요청
+  // 반환값: 감정 점수들, 주요 감정, 대화 요약, 한줄 리뷰, 미션 3개
   let data;
   try {
     ({ data } = await axios.post(
@@ -60,19 +66,20 @@ async function endSession(req, res) {
     dominant_emotion, context_summary, one_line_review, missions,
   } = data;
 
-  // session_analyses 저장 → reports 저장 → summaries 저장 → missions 저장
+  // session_analyses 저장 (감정 점수 + 주요 감정)
   const sessionAnalysisId = await reportRepo.createSessionAnalysis({
     session_id: id, user_id: req.user.user_id,
     joy_score, sad_score, anxiety_score, anger_score, hurt_score, embarrass_score, dominant_emotion,
   });
 
+  // reports / summaries / missions 동시에 저장
   await Promise.all([
     reportRepo.createReport({ user_id: req.user.user_id, session_id: id, session_analysis_id: sessionAnalysisId, one_line_review }),
     summaryRepo.createSummary({ user_id: req.user.user_id, session_id: id, context_summary }),
     missionRepo.createMissions(req.user.user_id, id, missions),
   ]);
 
-  // dominant_emotion이 5일 연속이면 감정 주의 신호 생성
+  // 주요 감정이 ALERT 목록에 있고 5일 연속이면 감정 주의 신호 자동 생성
   if (dominant_emotion && ALERT_EMOTIONS.includes(dominant_emotion)) {
     const isConsecutive = await sessionRepo.checkConsecutiveDays(req.user.user_id, dominant_emotion);
     if (isConsecutive) {
@@ -87,6 +94,7 @@ async function endSession(req, res) {
   res.json({ message: '세션이 종료되었습니다.' });
 }
 
+// 내 세션 목록 조회 (페이지네이션)
 async function getSessions(req, res) {
   const page = parseInt(req.query.page) || 1;
   const limit = parseInt(req.query.limit) || 20;
@@ -99,6 +107,7 @@ async function getSessions(req, res) {
   });
 }
 
+// 세션 단건 조회 — 다른 사람 세션 조회 차단 (IDOR 방어)
 async function getSessionById(req, res) {
   const { id } = req.params;
   const session = await sessionRepo.findSessionById(id);
@@ -113,6 +122,7 @@ async function getSessionById(req, res) {
   res.json({ session });
 }
 
+// 세션 대화 히스토리 조회 — 발화(emotion_logs)와 감정분석(log_analyses) JOIN해서 반환
 async function getSessionMessages(req, res) {
   const { id } = req.params;
   const session = await sessionRepo.findSessionById(id);

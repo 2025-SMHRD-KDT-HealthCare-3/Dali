@@ -1,15 +1,22 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import axios from 'axios'
 import './onboarding.css'
 import chatBgDark  from '../../assets/dark/챗봇 배경.png'
 import chatBgLight from '../../assets/light/챗봇 배경 라이트.png'
 import daliProfileImg from '../../assets/public/달리 프로필.png'
 import { useTheme } from '../../contexts/ThemeContext'
+import { useAuth } from '../../contexts/AuthContext'
+import { userApi } from '../../api/user'
+import { onboardingApi } from '../../api/onboarding'
 import MessageBubble from '../Public/MessageBubble'
 import TypingBubble  from '../Public/TypingBubble'
 
-/* ── 질문 명세 ── */
+/*
+ * QUESTIONS 배열 구조
+ *  conditional: true  → 회원이 이미 해당 정보를 가진 경우 스킵
+ *  question_no        → 온보딩 API에 전달할 번호 (페르소나 질문만 존재)
+ *  personaWeight      → 페르소나 계산에 사용 여부 표시 (참고용)
+ */
 const QUESTIONS = [
   {
     key: 'gender',
@@ -34,6 +41,7 @@ const QUESTIONS = [
   {
     key: 'emotion',
     conditional: false,
+    question_no: 1,
     text: '요즘 당신의 마음은 어떤가요?',
     type: 'quickreply',
     options: [
@@ -46,6 +54,7 @@ const QUESTIONS = [
   {
     key: 'energy',
     conditional: false,
+    question_no: 2,
     text: '요즘 하루 에너지 수준은 어떤가요?',
     type: 'quickreply',
     options: [
@@ -58,6 +67,7 @@ const QUESTIONS = [
   {
     key: 'topic',
     conditional: false,
+    question_no: 3,
     text: '최근 가장 신경 쓰이는 영역은 무엇인가요?',
     type: 'quickreply',
     options: [
@@ -71,6 +81,7 @@ const QUESTIONS = [
   {
     key: 'coachingStyle',
     conditional: false,
+    question_no: 4,
     text: '달리와 어떤 시간을 보내고 싶나요?',
     type: 'quickreply',
     options: [
@@ -83,11 +94,13 @@ const QUESTIONS = [
   {
     key: 'checkinTime',
     conditional: false,
+    question_no: 5,
     text: '하루 중 달리와 마음을 나누기 좋은 시간대는 언제예요?',
     type: 'quickreply',
     options: ['아침', '낮', '저녁', '밤'],
   },
 ]
+
 
 const GREETING = '안녕하세요! 저는 달리예요 🌙\n처음 만나서 반가워요! 잠깐 몇 가지 여쭤봐도 될까요?'
 
@@ -106,30 +119,56 @@ const SendIcon = () => (
 )
 
 /* ── 컴포넌트 ── */
-const Onboarding = ({ prefill = null, registerToken = null }) => {
-  const navigate = useNavigate()
+const Onboarding = ({ registerToken = null }) => {
+  const navigate   = useNavigate()
   const { isDark } = useTheme()
-  const bottomRef = useRef(null)
+  const { isAuthenticated, user } = useAuth()
+  const bottomRef  = useRef(null)
+
+  // 회원의 기존 프로필 또는 비회원 sessionStorage에서 prefill 계산 → conditional 질문 스킵
+  const prefill = useMemo(() => {
+    if (isAuthenticated && user) {
+      return {
+        nickname:  user.nick_name  || null,
+        gender:    user.gender     || null,
+        birthdate: user.birth_date || null,
+      }
+    }
+    try {
+      const stored = sessionStorage.getItem('dali_guest_profile')
+      if (stored) {
+        const p = JSON.parse(stored)
+        if (!p.expires || Date.now() < p.expires) {
+          return {
+            nickname:  p.nick_name  || null,
+            gender:    p.gender     || null,
+            birthdate: p.birth_date || null,
+          }
+        }
+        sessionStorage.removeItem('dali_guest_profile')
+      }
+    } catch {}
+    return null
+  }, [isAuthenticated, user])
 
   const activeQuestions = useMemo(
     () => QUESTIONS.filter(q => !q.conditional || !prefill?.[q.key]),
     [prefill]
   )
 
-  const [messages, setMessages]   = useState([])
-  const [isTyping, setIsTyping]   = useState(true)
-  const [step, setStep]           = useState(-1)
-  const [answers, setAnswers]     = useState({})
-  const [phase, setPhase]         = useState('typing')   // 'typing' | 'waiting' | 'submitting'
-  const [inputValue, setInputValue] = useState('')
+  const [messages,    setMessages]   = useState([])
+  const [isTyping,    setIsTyping]   = useState(true)
+  const [step,        setStep]       = useState(-1)
+  const [answers,     setAnswers]    = useState({})
+  const [phase,       setPhase]      = useState('typing')  // 'typing' | 'waiting' | 'submitting'
+  const [inputValue,  setInputValue] = useState('')
 
   const addDali = (text) =>
     setMessages(prev => [...prev, { id: Date.now() + Math.random(), role: 'dali', text, time: nowStr() }])
-
   const addUser = (text) =>
     setMessages(prev => [...prev, { id: Date.now() + Math.random(), role: 'user', text, time: nowStr() }])
 
-  /* 첫 인사 */
+  // 첫 인사
   useEffect(() => {
     const t1 = setTimeout(() => {
       addDali(GREETING)
@@ -144,7 +183,7 @@ const Onboarding = ({ prefill = null, registerToken = null }) => {
     return () => clearTimeout(t1)
   }, [])
 
-  /* step 변경 시 질문 노출 */
+  // step 변경 시 질문 노출
   useEffect(() => {
     if (step < 0 || step >= activeQuestions.length) return
     addDali(activeQuestions[step].text)
@@ -153,7 +192,7 @@ const Onboarding = ({ prefill = null, registerToken = null }) => {
     setInputValue('')
   }, [step])
 
-  /* 자동 스크롤 */
+  // 자동 스크롤
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, isTyping])
@@ -180,36 +219,58 @@ const Onboarding = ({ prefill = null, registerToken = null }) => {
   }
 
   const submitAll = async (allAnswers) => {
-    const demographic = {
-      nickname:  allAnswers.nickname  || prefill?.nickname,
-      gender:    allAnswers.gender    || prefill?.gender,
-      birthdate: allAnswers.birthdate || prefill?.birthdate,
-    }
+    const genderMap = { '여성': 'F', '남성': 'M' }
 
-    let accessToken = null
-    try {
-      if (registerToken) {
-        const res = await axios.post('/auth/sns/register', demographic, {
-          headers: { Authorization: `Bearer ${registerToken}` },
-          withCredentials: true,
-        })
-        accessToken = res.data?.access_token ?? null
+    // 1. 기본 정보 업데이트 (회원이고 conditional 질문에 답한 경우)
+    if (isAuthenticated) {
+      const demographic = {}
+      if (allAnswers.nickname)  demographic.nick_name  = allAnswers.nickname
+      if (allAnswers.gender && genderMap[allAnswers.gender])
+        demographic.gender = genderMap[allAnswers.gender]
+      if (allAnswers.birthdate) demographic.birth_date = allAnswers.birthdate
+
+      if (Object.keys(demographic).length > 0) {
+        try {
+          await userApi.updateMe({
+            nick_name:  demographic.nick_name  || user?.nick_name  || '',
+            gender:     demographic.gender     || user?.gender     || '',
+            birth_date: demographic.birth_date || user?.birth_date || '',
+          })
+        } catch (err) {
+          console.error('[onboarding] updateMe failed:', err)
+        }
       }
-    } catch (err) {
-      console.error('[onboarding] register failed:', err)
+    } else {
+      // 비회원: 기본 정보를 sessionStorage에 3시간 보관
+      sessionStorage.setItem('dali_guest_profile', JSON.stringify({
+        nick_name:  allAnswers.nickname  || null,
+        gender:     genderMap[allAnswers.gender] ?? null,
+        birth_date: allAnswers.birthdate || null,
+        expires:    Date.now() + 3 * 60 * 60 * 1000,
+      }))
     }
 
-    try {
-      const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : {}
-      await axios.post('/onboarding', {
-        emotion:       allAnswers.emotion,
-        energy:        allAnswers.energy,
-        topic:         allAnswers.topic,
-        coachingStyle: allAnswers.coachingStyle,
-        checkinTime:   allAnswers.checkinTime,
-      }, { headers })
-    } catch (err) {
-      console.error('[onboarding] onboarding failed:', err)
+    // 2. 페르소나 질문 개별 전송 (백엔드가 질문 1개씩 받는 구조, question_no 1~4만)
+    const personaQuestions = QUESTIONS.filter(q => !q.conditional && q.question_no && q.question_no <= 4)
+    for (const qDef of personaQuestions) {
+      const textAnswer = allAnswers[qDef.key]
+      if (!textAnswer) continue
+      const optionIdx = qDef.options.indexOf(textAnswer) + 1  // 1-based
+      if (optionIdx === 0) continue
+      try {
+        await onboardingApi.saveAnswer({
+          question_no: qDef.question_no,
+          question:    qDef.text,
+          exp_1: qDef.options[0],
+          exp_2: qDef.options[1],
+          exp_3: qDef.options[2],
+          exp_4: qDef.options[3],
+          exp_5: qDef.options[4] || null,
+          user_answer: optionIdx,
+        })
+      } catch (err) {
+        console.error(`[onboarding] Q${qDef.question_no} 저장 실패:`, err)
+      }
     }
 
     navigate('/main')
@@ -240,11 +301,9 @@ const Onboarding = ({ prefill = null, registerToken = null }) => {
       {/* 메시지 영역 */}
       <div className="ob-messages">
         <div className="ob-date-divider"><span>오늘</span></div>
-
         {messages.map(msg => (
           <MessageBubble key={msg.id} role={msg.role} text={msg.text} time={msg.time} />
         ))}
-
         {isTyping && <TypingBubble />}
         <div ref={bottomRef} />
       </div>

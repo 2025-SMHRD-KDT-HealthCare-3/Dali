@@ -1,6 +1,6 @@
 /*
  * summaryRepository - summaries 테이블
- * - createSummary        : 대화 요약 저장
+ * - createSummary        : 대화 요약 저장 (세션 종료 시 FastAPI context_summary 결과 저장)
  * - findSummariesByUser  : 사용자의 전체 요약 목록 조회 (페이지네이션)
  * - findSummaryById      : 요약 단건 조회
  */

@@ -6,12 +6,15 @@
 const logAnalysisRepo = require('../repositories/logAnalysisRepository');
 const sessionRepo = require('../repositories/sessionRepository');
 
+// 세션별 발화 감정 분석 목록 조회
+// chatController에서 FastAPI 응답의 감정 점수를 저장한 결과를 조회
 async function getLogAnalysesBySession(req, res) {
   const { session_id } = req.query;
   if (!session_id) {
     return res.status(400).json({ code: 'INVALID_REQUEST', message: 'session_id 쿼리 파라미터를 입력해주세요.' });
   }
 
+  // 세션 존재 여부 + 소유자 검증
   const session = await sessionRepo.findSessionById(session_id);
   if (!session) return res.status(404).json({ code: 'NOT_FOUND', message: '세션을 찾을 수 없습니다.' });
   if (session.user_id !== req.user.user_id) {

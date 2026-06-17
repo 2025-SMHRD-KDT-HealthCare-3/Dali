@@ -6,6 +6,7 @@
 
 const summaryRepo = require('../repositories/summaryRepository');
 
+// 내 대화 요약 목록 조회 (페이지네이션)
 async function getSummaries(req, res) {
   const page = parseInt(req.query.page) || 1;
   const limit = parseInt(req.query.limit) || 20;
@@ -18,6 +19,7 @@ async function getSummaries(req, res) {
   });
 }
 
+// 요약 단건 조회 — 다른 사람 요약 조회 차단 (IDOR 방어)
 async function getSummaryById(req, res) {
   const { id } = req.params;
   const summary = await summaryRepo.findSummaryById(id);
