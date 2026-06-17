@@ -14,7 +14,7 @@ from .prompts import MISSION_SYSTEM_PROMPT
 VALID_EMOTIONS = {"기쁨", "슬픔", "분노", "불안", "상처", "당황"}
 
 
-def generate_missions(emotion: str, conversation: str) -> list[dict]:
+async def generate_missions(emotion: str, conversation: str) -> list[dict]:
     """감정 점수·대화 요약을 받아 회복 미션 3개를 생성하고 dict 리스트로 반환.
 
     Args:
@@ -35,7 +35,7 @@ def generate_missions(emotion: str, conversation: str) -> list[dict]:
         },
     ]
 
-    raw = call_llm(messages, temperature=0.4)
+    raw = await call_llm(messages, temperature=0.4)
 
     # LLM이 ```json ... ``` 블록으로 감싸는 경우 방어
     cleaned = re.sub(r"```(?:json)?\s*|\s*```", "", raw).strip()
