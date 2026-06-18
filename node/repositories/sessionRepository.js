@@ -7,6 +7,8 @@
  * - findMessagesBySession : 세션의 대화 히스토리 조회 (chat_logs + chat_analyses JOIN)
  * - resetUserData         : 데이터 초기화 (개인정보 제외 전체 삭제)
  * - checkConsecutiveDays  : 특정 감정이 N일 연속인지 확인
+ * - getTodaySessionCount  : 오늘 세션 수 조회 (greeting_type 판단용)
+ * - getLastSessionDate    : 마지막 세션 날짜 조회 (방금 만든 세션 제외, greeting_type 판단용)
  */
 
 const pool = require('../config/db');
@@ -47,7 +49,7 @@ async function findSessionById(session_id) {
 // chat_logs(발화)와 chat_analyses(감정 점수)를 JOIN해서 대화 히스토리 반환
 async function findMessagesBySession(session_id) {
   const [rows] = await pool.query(
-    `SELECT cl.log_id, cl.speaker, cl.utterance, cl.turn_idx, cl.spoken_at,
+    `SELECT cl.log_id, cl.speaker AS role, cl.utterance AS content, cl.turn_idx, cl.spoken_at,
             ca.joy_score, ca.sad_score, ca.anxiety_score, ca.anger_score, ca.hurt_score, ca.embarrass_score
      FROM chat_logs cl
      LEFT JOIN chat_analyses ca ON cl.log_id = ca.log_id
@@ -101,4 +103,25 @@ async function resetUserData(user_id) {
   }
 }
 
-module.exports = { createSession, endSession, findSessionsByUser, findSessionById, findMessagesBySession, checkConsecutiveDays, resetUserData };
+// 오늘 세션 수 조회 — 방금 만든 세션 포함, greeting_type 판단용
+async function getTodaySessionCount(user_id) {
+  const [[{ cnt }]] = await pool.query(
+    `SELECT COUNT(*) AS cnt FROM sessions
+     WHERE user_id = ? AND DATE(created_at) = CURDATE()`,
+    [user_id]
+  );
+  return cnt;
+}
+
+// 마지막 세션 날짜 조회 — 방금 만든 세션 제외, greeting_type 판단용
+async function getLastSessionDate(user_id, currentSessionId) {
+  const [rows] = await pool.query(
+    `SELECT DATE(created_at) AS last_date FROM sessions
+     WHERE user_id = ? AND session_id != ?
+     ORDER BY created_at DESC LIMIT 1`,
+    [user_id, currentSessionId]
+  );
+  return rows[0]?.last_date ?? null;
+}
+
+module.exports = { createSession, endSession, findSessionsByUser, findSessionById, findMessagesBySession, checkConsecutiveDays, resetUserData, getTodaySessionCount, getLastSessionDate };

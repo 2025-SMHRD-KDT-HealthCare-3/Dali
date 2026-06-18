@@ -3,7 +3,9 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
-  envDir: '..', // 루트 .env 사용
+  define: {
+    'import.meta.env.VITE_API_URL': JSON.stringify('http://localhost:3000'),
+  },
   server: {
     host: true,
     proxy: {

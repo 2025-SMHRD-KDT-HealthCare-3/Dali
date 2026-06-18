@@ -7,7 +7,7 @@ const logAnalysisRepo = require('../repositories/logAnalysisRepository');
 const sessionRepo = require('../repositories/sessionRepository');
 
 // 세션별 발화 감정 분석 목록 조회
-// chatController에서 FastAPI 응답의 감정 점수를 저장한 결과를 조회
+// 발화별 감정 점수 조회 — chat_analyses는 감정 분석 모델 연동 후 Node에서 저장 예정
 async function getLogAnalysesBySession(req, res) {
   const { session_id } = req.query;
   if (!session_id) {

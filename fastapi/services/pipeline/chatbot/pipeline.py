@@ -9,7 +9,7 @@ from pathlib import Path
 
 from common.llm_client import call_llm
 
-ASSET_DIR = Path(__file__).parent.parent.parent / "asset"
+ASSET_DIR = Path(__file__).parent / "assets"
 DEFAULT_PERSONA = "공감형"
 
 # 지원하는 페르소나 목록

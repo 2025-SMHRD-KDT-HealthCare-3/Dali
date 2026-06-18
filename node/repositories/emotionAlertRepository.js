@@ -1,9 +1,11 @@
 /*
  * emotionAlertRepository - emotion_alerts 테이블
- * - findById     : 단건 조회 (소유자 검증용)
- * - findByUserId : 사용자의 감정 주의 신호 목록 조회 (페이지네이션)
- * - confirmAlert : 감정 주의 신호 확인 처리 (is_confirmed = 'Y', resolved_at 업데이트)
- * - createAlert  : 감정 주의 신호 생성
+ * - findById               : 단건 조회 (소유자 검증용)
+ * - findByUserId           : 사용자의 감정 주의 신호 목록 조회 (페이지네이션)
+ * - findLatestUnconfirmed  : 미확인 감정 주의 신호 최신 1건 (startSession 응답용)
+ * - findUnconfirmedByUserId: 미확인 감정 주의 신호 목록 조회 (FastAPI alert_context용)
+ * - confirmAlert           : 감정 주의 신호 확인 처리 (is_confirmed = 'Y', resolved_at 업데이트)
+ * - createAlert            : 감정 주의 신호 생성
  */
 
 const pool = require('../config/db');
@@ -26,6 +28,26 @@ async function findByUserId(user_id, page = 1, limit = 20) {
   return { total, rows };
 }
 
+// 미확인 감정 주의 신호 최신 1건 — startSession 응답의 alert_context 구성용
+async function findLatestUnconfirmed(user_id) {
+  const [rows] = await pool.query(
+    `SELECT * FROM emotion_alerts
+     WHERE user_id = ? AND is_confirmed = 'N'
+     ORDER BY alerted_at DESC LIMIT 1`,
+    [user_id]
+  );
+  return rows[0] ?? null;
+}
+
+// FastAPI에 전달할 alert_context 구성용 — 사용자가 아직 확인하지 않은 주의 신호만 반환
+async function findUnconfirmedByUserId(user_id) {
+  const [rows] = await pool.query(
+    "SELECT alerted_emotion, alert_reason, alerted_at FROM emotion_alerts WHERE user_id = ? AND is_confirmed = 'N' ORDER BY alerted_at DESC",
+    [user_id]
+  );
+  return rows;
+}
+
 async function confirmAlert(e_alert_id, user_id) {
   await pool.query(
     "UPDATE emotion_alerts SET is_confirmed = 'Y', resolved_at = NOW() WHERE e_alert_id = ? AND user_id = ?",
@@ -41,4 +63,4 @@ async function createAlert({ user_id, alerted_emotion, alert_reason }) {
   return result.insertId;
 }
 
-module.exports = { findById, findByUserId, confirmAlert, createAlert };
+module.exports = { findById, findByUserId, findLatestUnconfirmed, findUnconfirmedByUserId, confirmAlert, createAlert };
