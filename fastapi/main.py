@@ -151,6 +151,10 @@ async def internal_chat(req: ChatRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"LLM 호출 실패: {e}")
 
+    # 감정 점수 — Node 감정 모델 연동 전까지 0.0 유지 (chat_analyses NOT NULL 대응)
+    _STUB = {"joy_score": 0.0, "sad_score": 0.0, "anxiety_score": 0.0,
+             "anger_score": 0.0, "hurt_score": 0.0, "embarrass_score": 0.0}
+
     return {
         "reply": reply,
         "risk": {
@@ -159,6 +163,7 @@ async def internal_chat(req: ChatRequest):
             "action": None,
             "matched_category": None,
         },
+        **_STUB,
     }
 
 
