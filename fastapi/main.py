@@ -118,7 +118,7 @@ async def _fetch_score_rows(session_id: int) -> list[dict]:
                 """
                 SELECT la.joy_score, la.sad_score, la.anxiety_score,
                        la.anger_score, la.hurt_score, la.embarrass_score
-                FROM chat_log_analyses la
+                FROM chat_analyses la
                 JOIN chat_logs cl ON la.log_id = cl.log_id
                 WHERE cl.session_id = %s AND cl.speaker = 'user'
                 """,

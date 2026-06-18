@@ -9,6 +9,12 @@
   --color-primary-cta:    #7c5ad7;   /* CTA Purple  — 버튼, 활성 탭 */
   --color-primary-soft:   #B39BFF;   /* Soft Lavender — 강조, Secondary */
 
+  /* Purple Scale — 중간 단계 보라 계열 */
+  --color-purple-vivid:   #5B3FD6;   /* rgb(91, 63, 214)  — 진한 보라 */
+  --color-purple-accent:  #7B5FEF;   /* rgb(123, 95, 239) — UI 경계·강조 */
+  --color-purple-bright:  #8C63FF;   /* rgb(140, 99, 255) — 브랜드 CTA */
+  --color-purple-glow:    #9B7EFF;   /* rgb(155, 126, 255) — 글로우 효과 */
+
   /* Accent — Moon & Warm */
   --color-moon:           #F6E39A;   /* Moon Cream  — 달, 포인트 아이콘 */
   --color-mascot:         #C97A43;   /* Mascot Brown */
@@ -51,13 +57,31 @@
 
   /* Status */
   --color-success:        #2ecc71;
+  --color-success-bright: #5BC479;   /* rgb(91, 196, 121) — 성공 상태 표시 */
   --color-error:          #e74c3c;
+  --color-danger:         #E85C5C;   /* rgb(232, 92, 92)  — 삭제·위험 동작 */
+  --color-danger-dark:    #d63031;   /* 진한 위험 */
   --color-warning:        var(--color-moon);           /* #F6E39A */
 
   /* Social Brand */
   --color-google:         #1C1848;
   --color-naver:          #03C75A;
   --color-kakao:          #FEE500;
+
+  /* ════════════════════════════════════════════════
+     RGB 채널 변수 — rgba(var(--rgb-*), opacity) 패턴용
+     ════════════════════════════════════════════════ */
+  --rgb-primary:          33, 20, 107;    /* #21146B */
+  --rgb-purple-vivid:     91, 63, 214;    /* #5B3FD6 */
+  --rgb-purple-accent:    123, 95, 239;   /* #7B5FEF */
+  --rgb-purple-bright:    140, 99, 255;   /* #8C63FF */
+  --rgb-purple-glow:      155, 126, 255;  /* #9B7EFF */
+  --rgb-purple-lavender:  179, 155, 255;  /* #B39BFF */
+  --rgb-moon:             246, 227, 154;  /* #F6E39A */
+  --rgb-white:            255, 255, 255;
+  --rgb-black:            0, 0, 0;
+  --rgb-error:            232, 92, 92;    /* #E85C5C */
+  --rgb-success:          91, 196, 121;   /* #5BC479 */
 
   /* ════════════════════════════════════════════════
      Spacing

@@ -4,6 +4,7 @@ import './info.css'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
 import ThemeToggle from '../Public/ThemeToggle'
+import StarBg     from '../Public/StarBg'
 import { userApi } from '../../api/user'
 import { onboardingApi } from '../../api/onboarding'
 import { authApi } from '../../api/auth'
@@ -212,13 +213,7 @@ const Info = () => {
   return (
     <div className="info-screen">
 
-      <div className="info-bg" aria-hidden="true">
-        <span className="info-star is1">✦</span>
-        <span className="info-star is2">✦</span>
-        <span className="info-star is3">✦</span>
-        <span className="info-star is4">✦</span>
-        <span className="info-star is5">✦</span>
-      </div>
+      <StarBg bgClass="info-bg" starClass="info-star" positions={['is1','is2','is3','is4','is5']} />
 
       <ThemeToggle className="info-theme-toggle" />
 

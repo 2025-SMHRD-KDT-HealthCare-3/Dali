@@ -7,6 +7,7 @@ import daliLogoDark  from '../../assets/dark/달리로고.png'
 import daliLogoLight from '../../assets/light/달리라이트로고.png'
 import { useTheme } from '../../contexts/ThemeContext'
 import ThemeToggle  from '../Public/ThemeToggle'
+import StarBg       from '../Public/StarBg'
 
 const BackIcon = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -27,14 +28,7 @@ const Auth = () => {
       <ThemeToggle className="auth-theme-toggle" />
 
       {/* 배경 장식 */}
-      <div className="auth-bg" aria-hidden="true">
-        <span className="auth-star as1">✦</span>
-        <span className="auth-star as2">✦</span>
-        <span className="auth-star as3">✦</span>
-        <span className="auth-star as4">✦</span>
-        <span className="auth-star as5">✦</span>
-        <span className="auth-star as6">✦</span>
-      </div>
+      <StarBg bgClass="auth-bg" starClass="auth-star" positions={['as1','as2','as3','as4','as5','as6']} />
 
       <div className="auth-inner">
 
