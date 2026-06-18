@@ -1,7 +1,6 @@
 """달리 챗봇 대화 파이프라인.
 
 build_chat_reply: 페르소나 로드 → 메시지 조립 → LLM 호출 → 응답 반환
-detect_risk:      발화에서 위기 키워드 감지 → {detected, category}
 """
 
 import json
@@ -15,17 +14,6 @@ DEFAULT_PERSONA = "공감형"
 
 # 지원하는 페르소나 목록
 VALID_PERSONAS = {"공감형", "동기부여형", "분석형", "친구형"}
-
-# 위기 키워드 목록 (by category)
-_RISK_KEYWORDS: dict[str, list[str]] = {
-    "자살/자해": [
-        "죽고 싶", "자살", "자해", "목숨 끊", "사라지고 싶", "안 살고 싶",
-        "살기 싫", "죽어버리", "죽어야", "스스로 목",
-    ],
-    "폭력": [
-        "죽이고 싶", "때리고 싶", "칼로", "폭력",
-    ],
-}
 
 # 히스토리에서 LLM에 넘길 최대 턴 수 (user+assistant 각 N개)
 MAX_HISTORY_TURNS = 6
@@ -63,47 +51,39 @@ def _fewshot_messages(persona_data: dict, emotion: str | None) -> list[dict]:
     return messages
 
 
-def detect_risk(utterance: str) -> dict:
-    """발화에서 위기 키워드를 검사한다.
-
-    Returns:
-        {"detected": bool, "category": str | None}
-    """
-    for category, keywords in _RISK_KEYWORDS.items():
-        if any(kw in utterance for kw in keywords):
-            return {"detected": True, "category": category}
-    return {"detected": False, "category": None}
-
-
 async def build_chat_reply(
     utterance: str,
     *,
     persona: str = DEFAULT_PERSONA,
     emotion: str | None = None,
     history: list[dict] | None = None,
+    current_emotion_analysis: dict | None = None,
+    alert_context: dict | None = None,
+    recent_summaries: list[str] | None = None,
 ) -> str:
     """LLM에 메시지를 조립하고 응답 텍스트를 반환.
 
     Args:
-        utterance: 현재 사용자 발화
-        persona:   유저의 페르소나 코드 (공감형 | 동기부여형 | 분석형 | 친구형)
-        emotion:   세션 시작 시 선택한 감정 (few-shot 선택에 활용)
-        history:   이전 대화 [{"role": "user"|"assistant", "content": ...}, ...]
-
-    Returns:
-        LLM이 생성한 응답 텍스트
+        utterance:                현재 사용자 발화
+        persona:                  페르소나 코드 (공감형 | 동기부여형 | 분석형 | 친구형)
+        emotion:                  세션 시작 시 선택한 감정 (few-shot 선택에 활용)
+        history:                  이전 대화 [{"role": ..., "content": ...}]
+        current_emotion_analysis: 현재 발화 감정 분석 결과 (톤 조절용 참고값)
+        alert_context:            감정주의신호 맥락 (페르소나 응답 강도 조절용)
+        recent_summaries:         최근 세션 요약 목록 (대화 맥락 보강용)
     """
     persona_data = _load_persona(persona)
 
     messages: list[dict] = []
 
-    # 1) 시스템 메시지
-    messages.append({
-        "role": "system",
-        "content": _build_system_message(persona_data),
-    })
+    # 1) 시스템 메시지 (페르소나 기본 + 감정 분석/alert 보조 정보)
+    system_content = _build_system_message(persona_data)
+    system_content += _build_context_block(
+        emotion, current_emotion_analysis, alert_context, recent_summaries
+    )
+    messages.append({"role": "system", "content": system_content})
 
-    # 2) 감정별 few-shot 예시 (대화 히스토리 앞에 배치)
+    # 2) 감정별 few-shot 예시
     messages.extend(_fewshot_messages(persona_data, emotion))
 
     # 3) 최근 대화 히스토리 (최대 N 턴)
@@ -115,3 +95,42 @@ async def build_chat_reply(
     messages.append({"role": "user", "content": utterance})
 
     return await call_llm(messages, temperature=0.7)
+
+
+def _build_context_block(
+    emotion: str | None,
+    current_emotion_analysis: dict | None,
+    alert_context: dict | None,
+    recent_summaries: list[str] | None,
+) -> str:
+    """시스템 메시지에 추가할 동적 컨텍스트 블록."""
+    parts: list[str] = []
+
+    if emotion:
+        parts.append(f"\n\n[오늘 선택 감정]\n{emotion}")
+
+    if current_emotion_analysis:
+        dominant = current_emotion_analysis.get("dominant_emotion", "")
+        scores = current_emotion_analysis.get("emotion_scores", {})
+        score_str = " / ".join(f"{k} {v}" for k, v in scores.items()) if scores else ""
+        parts.append(
+            f"\n\n[현재 발화 감정 분석 — 톤 조절 참고용, 직접 언급 금지]\n"
+            f"대표 감정: {dominant}\n"
+            f"감정 점수: {score_str}"
+        )
+
+    if alert_context and alert_context.get("alert_detected"):
+        alert_emotion = alert_context.get("alert_emotion", "")
+        alert_reason = alert_context.get("alert_reason", "")
+        parts.append(
+            f"\n\n[감정주의신호 — 기본 페르소나 유지, 응답 강도만 조절]\n"
+            f"반복 감정: {alert_emotion}\n"
+            f"상황: {alert_reason}\n"
+            "안정감을 강화하고, 감정을 가볍게 넘기지 말 것. 진단하듯 표현하지 말 것."
+        )
+
+    if recent_summaries:
+        summaries_str = "\n".join(f"- {s}" for s in recent_summaries)
+        parts.append(f"\n\n[최근 세션 요약 — 대화 맥락 참고]\n{summaries_str}")
+
+    return "".join(parts)
