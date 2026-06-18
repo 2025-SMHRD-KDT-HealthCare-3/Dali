@@ -2,8 +2,8 @@
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(var(--rgb-white), 0.18);
+  background: rgba(var(--rgb-white), 0.1);
   font-size: 16px;
   line-height: 1;
   cursor: pointer;
@@ -13,10 +13,10 @@
   flex-shrink: 0;
   transition: background 0.2s;
 }
-.theme-toggle-btn:hover { background: rgba(255, 255, 255, 0.18); }
+.theme-toggle-btn:hover { background: rgba(var(--rgb-white), 0.18); }
 
 [data-theme="light"] .theme-toggle-btn {
-  background: rgba(33, 20, 107, 0.07);
-  border-color: rgba(33, 20, 107, 0.15);
+  background: rgba(var(--rgb-primary), 0.07);
+  border-color: rgba(var(--rgb-primary), 0.15);
 }
-[data-theme="light"] .theme-toggle-btn:hover { background: rgba(33, 20, 107, 0.14); }
+[data-theme="light"] .theme-toggle-btn:hover { background: rgba(var(--rgb-primary), 0.14); }

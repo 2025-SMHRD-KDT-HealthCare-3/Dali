@@ -1,0 +1,59 @@
+/* ══════════════════════════════════════════════
+   공통 배경 장식 — 별 · 달 · 배경 컨테이너
+   main.jsx 에서 전역으로 import
+══════════════════════════════════════════════ */
+
+/* ── 배경 장식 컨테이너 ── */
+
+.auth-bg, .splash-bg, .main-bg, .mission-bg {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.rp-bg, .info-bg, .settings-bg, .dm-bg, .ns-bg {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ── 별 반짝임 애니메이션 ── */
+
+@keyframes star-twinkle {
+  0%, 100% { opacity: 0.18; transform: scale(0.8); }
+  50%       { opacity: 0.88; transform: scale(1.22); }
+}
+
+/* ── 공통 별 기본 스타일 ── */
+
+.auth-star, .splash-star, .bg-star,
+.rp-star, .ms-star, .info-star,
+.set-star, .dm-star, .ns-star {
+  position: absolute;
+  color: var(--color-moon);
+  pointer-events: none;
+  animation: star-twinkle 3.5s ease-in-out infinite;
+}
+
+/* ── 라이트 모드: 별 색상 ── */
+
+[data-theme="light"] .auth-star,
+[data-theme="light"] .splash-star,
+[data-theme="light"] .bg-star,
+[data-theme="light"] .rp-star,
+[data-theme="light"] .ms-star,
+[data-theme="light"] .info-star,
+[data-theme="light"] .set-star,
+[data-theme="light"] .dm-star,
+[data-theme="light"] .ns-star {
+  color: var(--color-purple-bright);
+}
+
+/* ── 달 빛남 애니메이션 ── */
+
+@keyframes moon-glow {
+  0%, 100% { opacity: 0.68; filter: drop-shadow(0 0 20px rgba(var(--rgb-moon), 0.45)); }
+  50%       { opacity: 0.80; filter: drop-shadow(0 0 34px rgba(var(--rgb-moon), 0.72)); }
+}

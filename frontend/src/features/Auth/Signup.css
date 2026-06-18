@@ -123,7 +123,7 @@
   width: 22px;
   height: 22px;
   border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, 0.25);
+  border: 2px solid rgba(var(--rgb-white), 0.25);
   background: transparent;
   display: flex;
   align-items: center;

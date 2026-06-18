@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react'
 import ThemeToggle from '../Public/ThemeToggle'
+import StarBg     from '../Public/StarBg'
 import { useTheme } from '../../contexts/ThemeContext'
 import './report.css'
 import { reportApi } from '../../api/reports'
@@ -264,12 +265,7 @@ const Report = () => {
   return (
     <div className="report-screen">
 
-      <div className="rp-bg" aria-hidden="true">
-        <span className="rp-star rs1">✦</span>
-        <span className="rp-star rs2">✦</span>
-        <span className="rp-star rs3">✦</span>
-        <span className="rp-star rs4">✦</span>
-      </div>
+      <StarBg bgClass="rp-bg" starClass="rp-star" positions={['rs1','rs2','rs3','rs4']} />
 
       <ThemeToggle className="report-theme-toggle" />
 

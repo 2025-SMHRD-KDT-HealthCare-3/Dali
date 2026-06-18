@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import './NotificationSettings.css'
 import ThemeToggle from '../Public/ThemeToggle'
+import StarBg     from '../Public/StarBg'
 
 const STORAGE_KEY = 'dali_notification_settings'
 
@@ -53,12 +54,7 @@ const NotificationSettings = () => {
   return (
     <div className="ns-screen">
 
-      <div className="ns-bg" aria-hidden="true">
-        <span className="ns-star nss1">✦</span>
-        <span className="ns-star nss2">✦</span>
-        <span className="ns-star nss3">✦</span>
-        <span className="ns-star nss4">✦</span>
-      </div>
+      <StarBg bgClass="ns-bg" starClass="ns-star" positions={['nss1','nss2','nss3','nss4']} />
 
       <ThemeToggle className="ns-theme-toggle" />
 

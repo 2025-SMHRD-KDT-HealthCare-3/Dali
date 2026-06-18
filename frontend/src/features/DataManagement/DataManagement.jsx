@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import './DataManagement.css'
 import { useTheme } from '../../contexts/ThemeContext'
 import ThemeToggle from '../Public/ThemeToggle'
+import StarBg     from '../Public/StarBg'
 import { sessionApi } from '../../api/sessions'
 
 const DATA_ITEMS = [
@@ -34,12 +35,7 @@ const DataManagement = () => {
   return (
     <div className="dm-screen">
 
-      <div className="dm-bg" aria-hidden="true">
-        <span className="dm-star ds1">✦</span>
-        <span className="dm-star ds2">✦</span>
-        <span className="dm-star ds3">✦</span>
-        <span className="dm-star ds4">✦</span>
-      </div>
+      <StarBg bgClass="dm-bg" starClass="dm-star" positions={['ds1','ds2','ds3','ds4']} />
 
       <ThemeToggle className="dm-theme-toggle" />
 

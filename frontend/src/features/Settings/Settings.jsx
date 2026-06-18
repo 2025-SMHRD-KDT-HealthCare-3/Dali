@@ -15,6 +15,7 @@ import icLightModeLight from '../../assets/light/라이트모드.png'
 import icDarkModeLight  from '../../assets/light/다크모드.png'
 import icAlarmLight     from '../../assets/light/알림.png'
 import icDataLight      from '../../assets/light/데이터보관.png'
+import StarBg           from '../Public/StarBg'
 
 const Settings = () => {
   const navigate = useNavigate()
@@ -31,14 +32,7 @@ const Settings = () => {
     <div className="settings-screen">
 
       {/* 배경 장식 */}
-      <div className="settings-bg" aria-hidden="true">
-        <span className="set-star st1">✦</span>
-        <span className="set-star st2">✦</span>
-        <span className="set-star st3">✦</span>
-        <span className="set-star st4">✦</span>
-        <span className="set-star st5">✦</span>
-        <span className="set-star st6">✦</span>
-      </div>
+      <StarBg bgClass="settings-bg" starClass="set-star" positions={['st1','st2','st3','st4','st5','st6']} />
 
       <div className="settings-inner">
 

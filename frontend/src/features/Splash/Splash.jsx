@@ -4,6 +4,7 @@ import './splash.css'
 import moonImg from '../../assets/public/달.png'
 import { useTheme } from '../../contexts/ThemeContext'
 import ThemeToggle from '../Public/ThemeToggle'
+import StarBg     from '../Public/StarBg'
 
 const ChatIcon = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -28,15 +29,9 @@ const Splash = () => {
       <ThemeToggle className="splash-theme-toggle" />
 
       {/* 배경 장식 */}
-      <div className="splash-bg" aria-hidden="true">
+      <StarBg bgClass="splash-bg" starClass="splash-star" positions={['ss1','ss2','ss3','ss4','ss5','ss6']}>
         <img src={moonImg} alt="" className="splash-moon" />
-        <span className="splash-star ss1">✦</span>
-        <span className="splash-star ss2">✦</span>
-        <span className="splash-star ss3">✦</span>
-        <span className="splash-star ss4">✦</span>
-        <span className="splash-star ss5">✦</span>
-        <span className="splash-star ss6">✦</span>
-      </div>
+      </StarBg>
 
       <div className="splash-inner">
         <div className="splash-content">

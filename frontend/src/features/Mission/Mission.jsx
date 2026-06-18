@@ -9,6 +9,7 @@ import pl2Light from '../../assets/light/플레이리스트2라이트.png'
 import { useTheme }    from '../../contexts/ThemeContext'
 import { useAuth }     from '../../contexts/AuthContext'
 import ThemeToggle     from '../Public/ThemeToggle'
+import StarBg         from '../Public/StarBg'
 import { missionApi }  from '../../api/missions'
 
 const SEQ_STYLE = [
@@ -82,14 +83,7 @@ const Mission = () => {
   return (
     <div className="mission-screen">
 
-      <div className="mission-bg" aria-hidden="true">
-        <span className="ms-star st1">✦</span>
-        <span className="ms-star st2">✦</span>
-        <span className="ms-star st3">✦</span>
-        <span className="ms-star st4">✦</span>
-        <span className="ms-star st5">✦</span>
-        <span className="ms-star st6">✦</span>
-      </div>
+      <StarBg bgClass="mission-bg" starClass="ms-star" positions={['st1','st2','st3','st4','st5','st6']} />
 
       <ThemeToggle className="mission-theme-toggle" />
 

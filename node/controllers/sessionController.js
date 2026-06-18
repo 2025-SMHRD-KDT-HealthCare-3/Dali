@@ -76,7 +76,10 @@ async function endSession(req, res) {
   await Promise.all([
     reportRepo.createReport({ user_id: req.user.user_id, session_id: id, session_analysis_id: sessionAnalysisId, one_line_review }),
     summaryRepo.createSummary({ user_id: req.user.user_id, session_id: id, context_summary }),
-    missionRepo.createMissions(req.user.user_id, id, missions),
+    missionRepo.createMissions(req.user.user_id, id, missions.map((m, i) => ({
+      mission_seq: i + 1,
+      mission_content: m.title,
+    }))),
   ]);
 
   // 주요 감정이 ALERT 목록에 있고 5일 연속이면 감정 주의 신호 자동 생성
