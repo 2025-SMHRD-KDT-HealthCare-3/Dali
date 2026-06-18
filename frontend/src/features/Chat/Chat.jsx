@@ -51,6 +51,8 @@ const SendIcon = () => (
   </svg>
 )
 
+const STORAGE_KEY = 'dali_chat_session'
+
 const Chat = () => {
   const navigate  = useNavigate()
   const location  = useLocation()
@@ -70,6 +72,7 @@ const Chat = () => {
   /* ── 세션 상태 ── */
   const [sessionId, setSessionId] = useState(null)
   const sessionIdRef = useRef(null)
+  const [isEnding, setIsEnding] = useState(false)
 
   const VALID_EMOTIONS = new Set(['기쁨', '슬픔', '불안', '분노', '상처', '당황'])
 
@@ -86,18 +89,21 @@ const Chat = () => {
     }
   }
 
-  // 마운트 시 세션 시작
+  // 마운트 시 세션 복원 or 신규 시작
   useEffect(() => {
-    startSession(locState.emotion)
-  }, [])
-
-  // 화면 떠날 때 세션 종료
-  useEffect(() => {
-    return () => {
-      if (sessionIdRef.current) {
-        sessionApi.endSession(sessionIdRef.current).catch(() => {})
-      }
+    const saved = sessionStorage.getItem(STORAGE_KEY)
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved)
+        if (parsed.sessionId) {
+          setSessionId(parsed.sessionId)
+          sessionIdRef.current = parsed.sessionId
+          if (parsed.messages?.length) setMessages(parsed.messages)
+          return
+        }
+      } catch {}
     }
+    startSession(locState.emotion)
   }, [])
 
   /* ── 메시지 / 입력 상태 ── */
@@ -107,6 +113,27 @@ const Chat = () => {
   const [isTyping, setIsTyping] = useState(false)
   const [input,    setInput]    = useState('')
   const [isRisk,   setIsRisk]   = useState(false)
+
+  // sessionStorage 동기화 — sessionId·messages 바뀔 때마다 저장
+  useEffect(() => {
+    if (!sessionId) return
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ sessionId, messages }))
+  }, [sessionId, messages])
+
+  /* ── 세션 종료 핸들러 ── */
+  const handleEndSession = async () => {
+    if (!sessionId || isEnding) return
+    setIsEnding(true)
+    try {
+      await sessionApi.endSession(sessionId)
+    } catch {}
+    sessionStorage.removeItem(STORAGE_KEY)
+    sessionIdRef.current = null
+    setSessionId(null)
+    setIsEnding(false)
+    setShowEndModal(false)
+    navigate('/', { replace: true })
+  }
 
   const addDali = (text) =>
     setMessages(prev => [...prev, { id: Date.now() + Math.random(), role: 'dali', text, time: now() }])
@@ -172,6 +199,13 @@ const Chat = () => {
           </div>
         </div>
         <ThemeToggle className="chat-theme-toggle" />
+        <button
+          className="chat-end-btn"
+          onClick={handleEndSession}
+          disabled={isEnding || !sessionId}
+        >
+          {isEnding ? '종료 중' : '종료하기'}
+        </button>
       </header>
 
       {/* 메시지 영역 */}
@@ -224,6 +258,7 @@ const Chat = () => {
           <SendIcon />
         </button>
       </div>
+
 
     </div>
   )

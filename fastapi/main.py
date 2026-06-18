@@ -2,10 +2,12 @@
 
 엔드포인트:
   GET  /health                    — 헬스체크 (docker-compose healthcheck)
-  POST /internal/chat             — Node → 챗봇 대화 (LLM 응답 + 감정 점수)
+  POST /internal/chat             — Node → 챗봇 대화 (2단계 위험 감지 + LLM 응답)
   POST /internal/stt              — Node → 음성 파일 → 텍스트 변환 (Whisper)
-  POST /onboarding/context        — Node → 온보딩 q3 자유 답변 수신
   POST /sessions/{id}/analyze     — Node → 세션 종료 후 전체 분석
+
+FastAPI는 DB를 직접 조회하지 않는다.
+모든 컨텍스트(history, persona, score_rows 등)는 Node가 전달한다.
 """
 
 import os
@@ -14,26 +16,17 @@ from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 load_dotenv()
 
-import aiomysql
 from fastapi import Depends, FastAPI, File, HTTPException, Path, UploadFile
 from pydantic import BaseModel
 
-import common.db as db
 from middleware.auth import require_internal_key
-from services.pipeline.chatbot.pipeline import build_chat_reply, detect_risk
+from services.pipeline.chatbot.pipeline import build_chat_reply
+from services.pipeline.chatbot.risk_gate import detect_risk_with_context
+from services.pipeline.chatbot.safety_response import get_safety_response
 from services.pipeline.report.pipeline import analyze_session
 
 
-# ── 앱 수명주기 ────────────────────────────────────────────────────────────────
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    await db.create_pool()
-    yield
-    await db.close_pool()
-
-
-app = FastAPI(title="Dali LLM API", lifespan=lifespan)
+app = FastAPI(title="Dali LLM API")
 
 
 # ── 헬스체크 ───────────────────────────────────────────────────────────────────
@@ -45,166 +38,133 @@ def health_check():
 
 # ── 요청 스키마 ────────────────────────────────────────────────────────────────
 
+class EmotionScores(BaseModel):
+    기쁨:  float = 0.0
+    슬픔:  float = 0.0
+    불안:  float = 0.0
+    분노:  float = 0.0
+    상처:  float = 0.0
+    당황:  float = 0.0
+
+
+class EmotionAnalysis(BaseModel):
+    dominant_emotion: str | None = None
+    emotion_scores:   EmotionScores | None = None
+
+
+class AlertContext(BaseModel):
+    alert_id:       int | None = None
+    alert_detected: bool = False
+    alert_emotion:  str | None = None
+    alert_reason:   str | None = None
+    alert_message:  str | None = None
+
+
 class ChatRequest(BaseModel):
-    log_id:     int | None = None
-    session_id: int | None = None
-    user_id:    int | None = None
-    utterance:  str
+    utterance:                str
+    user_id:                  int | None = None
+    session_id:               int | None = None
+    log_id:                   int | None = None
+    persona:                  str = "공감형"
+    persona_source:           str | None = None
+    selected_emotion:         str | None = None
+    history:                  list[dict] = []
+    current_emotion_analysis: EmotionAnalysis | None = None
+    alert_context:            AlertContext | None = None
+    recent_summaries:         list[str] | None = None
 
 
-class OnboardingContextRequest(BaseModel):
-    user_id:   int
-    q3_answer: str
+class ScoreRow(BaseModel):
+    joy_score:       float = 0.0
+    sad_score:       float = 0.0
+    anxiety_score:   float = 0.0
+    anger_score:     float = 0.0
+    hurt_score:      float = 0.0
+    embarrass_score: float = 0.0
 
 
 class SessionAnalyzeRequest(BaseModel):
-    user_id: int
-
-
-# ── 내부 DB 헬퍼 ───────────────────────────────────────────────────────────────
-
-async def _fetch_user_persona(user_id: int) -> str:
-    pool = db.get_pool()
-    async with pool.acquire() as conn:
-        async with conn.cursor() as cur:
-            await cur.execute(
-                "SELECT persona FROM users WHERE user_id = %s",
-                (user_id,),
-            )
-            row = await cur.fetchone()
-            return row[0] if row and row[0] else "공감형"
-
-
-async def _fetch_chat_history(session_id: int, limit: int = 20) -> list[dict]:
-    """최근 대화를 [{"role": ..., "content": ...}] 형식으로 반환."""
-    pool = db.get_pool()
-    async with pool.acquire() as conn:
-        async with conn.cursor() as cur:
-            await cur.execute(
-                """
-                SELECT speaker, utterance
-                FROM chat_logs
-                WHERE session_id = %s
-                ORDER BY turn_idx DESC
-                LIMIT %s
-                """,
-                (session_id, limit),
-            )
-            rows = await cur.fetchall()
-    rows = list(reversed(rows))
-    return [
-        {"role": "user" if r[0] == "user" else "assistant", "content": r[1] or ""}
-        for r in rows
-    ]
-
-
-async def _fetch_session_logs(session_id: int) -> list[dict]:
-    pool = db.get_pool()
-    async with pool.acquire() as conn:
-        async with conn.cursor() as cur:
-            await cur.execute(
-                "SELECT speaker, utterance FROM chat_logs WHERE session_id = %s ORDER BY turn_idx ASC",
-                (session_id,),
-            )
-            rows = await cur.fetchall()
-    return [{"speaker": r[0], "utterance": r[1]} for r in rows]
-
-
-async def _fetch_score_rows(session_id: int) -> list[dict]:
-    pool = db.get_pool()
-    async with pool.acquire() as conn:
-        async with conn.cursor() as cur:
-            await cur.execute(
-                """
-                SELECT la.joy_score, la.sad_score, la.anxiety_score,
-                       la.anger_score, la.hurt_score, la.embarrass_score
-                FROM chat_analyses la
-                JOIN chat_logs cl ON la.log_id = cl.log_id
-                WHERE cl.session_id = %s AND cl.speaker = 'user'
-                """,
-                (session_id,),
-            )
-            rows = await cur.fetchall()
-    cols = ["joy_score", "sad_score", "anxiety_score", "anger_score", "hurt_score", "embarrass_score"]
-    return [dict(zip(cols, r)) for r in rows]
+    user_id:          int
+    selected_emotion: str = "슬픔"
+    chat_logs:        list[dict] = []   # [{speaker, utterance}]
+    score_rows:       list[ScoreRow] = []
 
 
 # ── 엔드포인트 ─────────────────────────────────────────────────────────────────
 
 @app.post("/internal/chat", dependencies=[Depends(require_internal_key)])
 async def internal_chat(req: ChatRequest):
-    """Node.js에서 사용자 발화를 받아 LLM 응답과 감정 점수를 반환.
+    """Node.js에서 사용자 발화를 받아 LLM 응답을 반환.
 
-    감정 분석(KoELECTRA)은 에스라 파트에서 구현 예정.
-    현재는 세션 선택 감정 기준 stub 점수를 반환.
+    처리 순서:
+      1) risk_gate — 2단계 위험 감지 (키워드 → LLM 문맥 판단)
+      2) risk/critical → 고정 안전 응답 반환
+      3) watch → 안전 확인 질문 반환
+      4) none → 페르소나 + 감정 분석 + alert 컨텍스트 기반 LLM 응답 생성
     """
     utterance = req.utterance or ""
 
-    # 위기 키워드 검사
-    risk = detect_risk(utterance)
-    if risk["detected"]:
+    # ── 위험 감지 ──────────────────────────────────────────────────────────────
+    risk = await detect_risk_with_context(utterance, req.history)
+    risk_level = risk["risk_level"]
+
+    if risk_level in ("risk", "critical"):
         return {
-            "reply": None,
-            "risk": {"detected": True, "action": risk["category"]},
-            "joy_score": 0.1, "sad_score": 0.1, "anxiety_score": 0.1,
-            "anger_score": 0.1, "hurt_score": 0.1, "embarrass_score": 0.1,
+            "reply": get_safety_response(risk_level),
+            "risk": {
+                "detected": True,
+                "risk_level": risk_level,
+                "action": risk["matched_category"],
+                "matched_category": risk["matched_category"],
+            },
         }
 
-    # 세션·유저 정보 조회
-    persona = "공감형"
-    emotion = None
-    history: list[dict] = []
+    if risk_level == "watch":
+        return {
+            "reply": get_safety_response("watch"),
+            "risk": {
+                "detected": False,
+                "risk_level": "watch",
+                "action": None,
+                "matched_category": risk["matched_category"],
+            },
+        }
 
-    if req.session_id:
-        try:
-            pool = db.get_pool()
-            async with pool.acquire() as conn:
-                async with conn.cursor() as cur:
-                    await cur.execute(
-                        "SELECT selected_emotion FROM sessions WHERE session_id = %s",
-                        (req.session_id,),
-                    )
-                    row = await cur.fetchone()
-                    if row:
-                        emotion = row[0]
-        except Exception:
-            pass
+    # ── LLM 응답 생성 ──────────────────────────────────────────────────────────
+    emotion_analysis = (
+        req.current_emotion_analysis.model_dump() if req.current_emotion_analysis else None
+    )
+    alert_ctx = (
+        req.alert_context.model_dump() if req.alert_context else None
+    )
 
-        try:
-            history = await _fetch_chat_history(req.session_id)
-            # 방금 저장된 현재 발화가 history 말미에 있으면 제거 (중복 방지)
-            if history and history[-1]["role"] == "user" and history[-1]["content"] == utterance:
-                history = history[:-1]
-        except Exception:
-            pass
-
-    if req.user_id:
-        try:
-            persona = await _fetch_user_persona(req.user_id)
-        except Exception:
-            pass
-
-    # LLM 응답 생성
     try:
         reply = await build_chat_reply(
             utterance,
-            persona=persona,
-            emotion=emotion,
-            history=history,
+            persona=req.persona,
+            emotion=req.selected_emotion,
+            history=req.history,
+            current_emotion_analysis=emotion_analysis,
+            alert_context=alert_ctx,
+            recent_summaries=req.recent_summaries,
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"LLM 호출 실패: {e}")
 
-    # 감정 점수 stub (KoELECTRA 연동 전 — 선택 감정에 높은 점수 부여)
-    _EMOTION_TO_FIELD = {
-        "기쁨": "joy_score", "슬픔": "sad_score", "불안": "anxiety_score",
-        "분노": "anger_score", "상처": "hurt_score", "당황": "embarrass_score",
-    }
-    scores = {f: 0.1 for f in _EMOTION_TO_FIELD.values()}
-    if emotion and emotion in _EMOTION_TO_FIELD:
-        scores[_EMOTION_TO_FIELD[emotion]] = 0.5
+    # 감정 점수 — Node 감정 모델 연동 전까지 0.0 유지 (chat_analyses NOT NULL 대응)
+    _STUB = {"joy_score": 0.0, "sad_score": 0.0, "anxiety_score": 0.0,
+             "anger_score": 0.0, "hurt_score": 0.0, "embarrass_score": 0.0}
 
-    return {"reply": reply, "risk": {"detected": False, "action": None}, **scores}
+    return {
+        "reply": reply,
+        "risk": {
+            "detected": False,
+            "risk_level": "none",
+            "action": None,
+            "matched_category": None,
+        },
+        **_STUB,
+    }
 
 
 @app.post("/internal/stt", dependencies=[Depends(require_internal_key)])
@@ -226,38 +186,18 @@ async def internal_stt(audio: UploadFile = File(...)):
     return {"text": transcript.text}
 
 
-@app.post("/onboarding/context", dependencies=[Depends(require_internal_key)])
-async def onboarding_context(req: OnboardingContextRequest):
-    """온보딩 자유 답변(q3)을 수신. 현재는 수신 확인만 반환."""
-    return {"ok": True}
-
-
 @app.post("/sessions/{session_id}/analyze", dependencies=[Depends(require_internal_key)])
 async def analyze_session_endpoint(
     session_id: int = Path(...),
     req: SessionAnalyzeRequest = ...,
 ):
-    """세션 종료 후 전체 대화를 분석해 감정 점수·요약·리뷰·미션을 반환."""
+    """세션 종료 후 전체 대화를 분석해 요약·리뷰·미션을 반환.
+
+    Node가 chat_logs, score_rows, selected_emotion을 전달한다.
+    """
     try:
-        chat_logs = await _fetch_session_logs(session_id)
-        score_rows = await _fetch_score_rows(session_id)
-
-        selected_emotion = "슬픔"
-        try:
-            pool = db.get_pool()
-            async with pool.acquire() as conn:
-                async with conn.cursor() as cur:
-                    await cur.execute(
-                        "SELECT selected_emotion FROM sessions WHERE session_id = %s",
-                        (session_id,),
-                    )
-                    row = await cur.fetchone()
-                    if row and row[0]:
-                        selected_emotion = row[0]
-        except Exception:
-            pass
-
-        result = await analyze_session(chat_logs, score_rows, selected_emotion)
+        score_rows_dicts = [r.model_dump() for r in req.score_rows]
+        result = await analyze_session(req.chat_logs, score_rows_dicts, req.selected_emotion)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"세션 분석 실패: {e}")
 
