@@ -31,3 +31,12 @@ npm-debug.log*
 
 # Claude Code
 .claude/
+
+
+# 미디어 실제 파일 제외
+/media/music/*
+/media/video/*
+
+# 폴더 구조는 유지
+!/media/music/.gitkeep
+!/media/video/.gitkeep
