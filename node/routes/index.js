@@ -33,7 +33,7 @@
  * - GET    /api/sessions/:id/messages             세션 대화 히스토리 조회
  *
  * [챗봇]
- * - POST   /api/chat                              사용자 메시지 전송 및 AI 응답 생성
+ * - POST   /api/chat/respond                      텍스트 발화 전송 → FastAPI 호출 → AI 응답 생성 (디바운스 후 프론트에서 합쳐서 전송)
  * - POST   /api/chat/audio                        음성 파일 → STT 변환 → AI 응답 생성
  *
  * [발화별 감정 분석]
@@ -44,6 +44,7 @@
  * - GET    /api/summaries/:id                     요약 상세 조회
  *
  * [리포트]
+ * - GET    /api/reports/dates?month=YYYY-MM        리포트 있는 날짜 목록 조회
  * - GET    /api/reports/daily?date=YYYY-MM-DD     일간 감정 리포트 조회
  * - GET    /api/reports/monthly?month=YYYY-MM     월간 감정 리포트 조회
  *
@@ -121,7 +122,9 @@ router.patch('/sessions/:id/end', requireLogin, sessionCtrl.endSession);
 router.get('/sessions/:id/messages', requireLogin, sessionCtrl.getSessionMessages);
 
 // 챗봇 대화
-router.post('/chat', optionalLogin, chatCtrl.chat);
+// /chat/respond: 프론트에서 디바운스 후 합쳐서 전송 → FastAPI 호출 → 응답 후 DB 저장
+// /chat/audio: 음성은 녹음 종료가 곧 발화의 끝이므로 STT 완료 즉시 FastAPI 호출
+router.post('/chat/respond', requireLogin, chatCtrl.chatRespond);
 router.post('/chat/audio', optionalLogin, chatCtrl.upload.single('audio'), chatCtrl.chatAudio);
 
 // 발화별 감정 분석
@@ -132,6 +135,7 @@ router.get('/summaries', requireLogin, summaryCtrl.getSummaries);
 router.get('/summaries/:id', requireLogin, summaryCtrl.getSummaryById);
 
 // 리포트
+router.get('/reports/dates', requireLogin, reportCtrl.getReportDates);
 router.get('/reports/daily', requireLogin, reportCtrl.getDailyReports);
 router.get('/reports/monthly', requireLogin, reportCtrl.getMonthlyReports);
 

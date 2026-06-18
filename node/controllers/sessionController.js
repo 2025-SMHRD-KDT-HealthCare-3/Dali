@@ -14,22 +14,58 @@ const reportRepo = require('../repositories/reportRepository');
 const summaryRepo = require('../repositories/summaryRepository');
 const missionRepo = require('../repositories/missionRepository');
 
+// 날짜 차이 계산 — greeting_type 판단용 (long_time_return 기준: 7일 이상)
+function daysDiff(dateStr) {
+  const now  = new Date();
+  const past = new Date(dateStr);
+  return Math.floor((now - past) / (1000 * 60 * 60 * 24));
+}
+
 // 감정 주의 신호를 발생시킬 감정 목록
 const ALERT_EMOTIONS = ['슬픔', '불안', '분노', '상처'];
 
-// 세션 시작 — 감정 선택 후 호출, session_id 반환
+// 세션 시작 — 감정 선택 후 호출, session_id + greeting_type 반환
 async function startSession(req, res) {
   const { selected_emotion } = req.body;
   if (!selected_emotion) {
     return res.status(400).json({ code: 'INVALID_REQUEST', message: '감정을 선택해주세요.' });
   }
 
-  const sessionId = await sessionRepo.createSession({
-    user_id: req.user.user_id,
-    selected_emotion,
-  });
+  const user_id = req.user.user_id;
+  const sessionId = await sessionRepo.createSession({ user_id, selected_emotion });
 
-  res.status(201).json({ session_id: sessionId });
+  // greeting_type 판단에 필요한 데이터 병렬 조회
+  const [totalCount, lastDate, latestAlert] = await Promise.all([
+    sessionRepo.getTodaySessionCount(user_id),       // 방금 만든 세션 포함
+    sessionRepo.getLastSessionDate(user_id, sessionId), // 방금 만든 세션 제외
+    emotionAlertRepo.findLatestUnconfirmed(user_id),
+  ]);
+
+  // greeting_type 판단 — 우선순위: emotion_alert > first_visit > long_time_return > same_day_return > today_first
+  const isFirstVisit     = !lastDate && totalCount === 1;
+  const isLongTimeReturn = lastDate && daysDiff(lastDate) >= 7;
+  const isSameDayReturn  = totalCount > 1;
+
+  const greeting_type =
+    latestAlert        ? 'emotion_alert'     :
+    isFirstVisit       ? 'first_visit'       :
+    isLongTimeReturn   ? 'long_time_return'  :
+    isSameDayReturn    ? 'same_day_return'   :
+    'today_first';
+
+  res.status(201).json({
+    session_id:          sessionId,
+    greeting_type,
+    today_session_count: totalCount - 1,  // 방금 만든 세션 제외한 오늘 세션 수
+    last_session_date:   lastDate ? lastDate.toISOString().split('T')[0] : null,
+    has_emotion_alert:   !!latestAlert,
+    alert_context: latestAlert ? {
+      alert_id:      latestAlert.e_alert_id,
+      alert_emotion: latestAlert.alerted_emotion,
+      alert_reason:  latestAlert.alert_reason,
+      alert_message: `최근 며칠 동안 ${latestAlert.alerted_emotion} 감정이 자주 나타나고 있어요.`,
+    } : null,
+  });
 }
 
 // 세션 종료 — FastAPI에 분석 요청 후 결과를 여러 테이블에 저장
@@ -48,13 +84,31 @@ async function endSession(req, res) {
   // DB에서 세션 ended_at 업데이트
   await sessionRepo.endSession(id);
 
+  // FastAPI 페이로드 구성 — 대화 내역과 감정 점수를 직접 조회해서 전달
+  // FastAPI가 DB를 직접 조회하지 않고 Node에서 넘겨주는 방식
+  const messages = await sessionRepo.findMessagesBySession(id);
+  // chat_logs: role/content 형식으로 변환
+  const chat_logs = messages.map(m => ({ role: m.role, content: m.content }));
+  // score_rows: 사용자 발화 중 감정 점수가 있는 것만 추출
+  const score_rows = messages
+    .filter(m => m.role === 'user' && m.joy_score !== null)
+    .map(m => ({
+      joy_score: m.joy_score, sad_score: m.sad_score, anxiety_score: m.anxiety_score,
+      anger_score: m.anger_score, hurt_score: m.hurt_score, embarrass_score: m.embarrass_score,
+    }));
+
   // FastAPI에 세션 분석 요청
   // 반환값: 감정 점수들, 주요 감정, 대화 요약, 한줄 리뷰, 미션 3개
   let data;
   try {
     ({ data } = await axios.post(
       `${process.env.FASTAPI_URL}/sessions/${id}/analyze`,
-      { user_id: req.user.user_id },
+      {
+        user_id:          req.user.user_id,
+        selected_emotion: session.selected_emotion,
+        chat_logs,
+        score_rows,
+      },
       { headers: { 'X-Internal-API-Key': process.env.INTERNAL_API_KEY } }
     ));
   } catch {
