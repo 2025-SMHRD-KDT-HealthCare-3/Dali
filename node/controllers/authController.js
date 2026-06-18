@@ -382,6 +382,7 @@ async function kakaoAuth(req, res) {
     params: {
       grant_type: 'authorization_code',
       client_id: process.env.KAKAO_CLIENT_ID,
+      client_secret: process.env.KAKAO_CLIENT_SECRET,
       redirect_uri: process.env.KAKAO_REDIRECT_URI,
       code,
     },
