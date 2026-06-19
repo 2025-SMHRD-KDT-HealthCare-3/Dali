@@ -6,6 +6,10 @@ import pl1Dark  from '../../assets/dark/플레이리스트1.png'
 import pl2Dark  from '../../assets/dark/플레이리스트2.png'
 import pl1Light from '../../assets/light/플레이리스트1라이트.png'
 import pl2Light from '../../assets/light/플레이리스트2라이트.png'
+import musicDark  from '../../assets/dark/음악달리다크.png'
+import videoDark  from '../../assets/dark/영상달리다크.png'
+import musicLight from '../../assets/light/음악달리라이트.png'
+import videoLight from '../../assets/light/영상달리라이트.png'
 import { useTheme }    from '../../contexts/ThemeContext'
 import { useAuth }     from '../../contexts/AuthContext'
 import ThemeToggle     from '../Public/ThemeToggle'
@@ -78,7 +82,7 @@ const Mission = () => {
   const behaviorMissions = missions.filter(m => m.mission_date?.slice(0, 10) === today && m.mission_seq <= 3)
   const behaviorDone     = behaviorMissions.filter(m => m.is_completed === 'Y').length
   const behaviorTotal    = behaviorMissions.length
-  const plImgs           = isDark ? [pl1Dark, pl2Dark] : [pl1Light, pl2Light]
+  const plImgs           = isDark ? [musicDark, videoDark] : [musicLight, videoLight]
 
   return (
     <div className="mission-screen">

@@ -41,10 +41,11 @@ async function tryRefresh() {
 }
 
 /* ── 공통 요청 함수 ── */
-// auth:  true 이면 Authorization 헤더 추가 (기본값)
-// retry: 401 시 토큰 재발급 후 1회 재시도 여부 (무한루프 방지)
-async function request(path, { method = 'GET', body, auth = true, retry = true } = {}) {
-  const headers = { 'Content-Type': 'application/json' }
+// auth:    true 이면 Authorization 헤더 추가 (기본값)
+// retry:   401 시 토큰 재발급 후 1회 재시도 여부 (무한루프 방지)
+// rawBody: true 이면 Content-Type 생략 + body를 JSON.stringify 하지 않음 (FormData 전송용)
+async function request(path, { method = 'GET', body, auth = true, retry = true, rawBody = false } = {}) {
+  const headers = rawBody ? {} : { 'Content-Type': 'application/json' }
 
   if (auth && _accessToken) {
     headers['Authorization'] = `Bearer ${_accessToken}`
@@ -54,7 +55,7 @@ async function request(path, { method = 'GET', body, auth = true, retry = true }
     method,
     credentials: 'include', // httpOnly 쿠키 자동 전송
     headers,
-    ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+    ...(body !== undefined ? { body: rawBody ? body : JSON.stringify(body) } : {}),
   })
 
   // 401 → 재발급 성공 시 원래 요청 1회 재시도
@@ -88,9 +89,10 @@ async function request(path, { method = 'GET', body, auth = true, retry = true }
 /* ── HTTP 메서드 헬퍼 ── */
 // options 로 { auth: false } 등 request 옵션 전달 가능
 export const api = {
-  get:    (path, options)        => request(path, { ...options, method: 'GET' }),
-  post:   (path, body, options)  => request(path, { ...options, method: 'POST', body }),
-  put:    (path, body, options)  => request(path, { ...options, method: 'PUT', body }),
-  patch:  (path, body, options)  => request(path, { ...options, method: 'PATCH', body }),
-  delete: (path, options)        => request(path, { ...options, method: 'DELETE' }),
+  get:      (path, options)          => request(path, { ...options, method: 'GET' }),
+  post:     (path, body, options)    => request(path, { ...options, method: 'POST', body }),
+  put:      (path, body, options)    => request(path, { ...options, method: 'PUT', body }),
+  patch:    (path, body, options)    => request(path, { ...options, method: 'PATCH', body }),
+  delete:   (path, options)          => request(path, { ...options, method: 'DELETE' }),
+  postForm: (path, formData, options) => request(path, { ...options, method: 'POST', body: formData, rawBody: true }),
 }

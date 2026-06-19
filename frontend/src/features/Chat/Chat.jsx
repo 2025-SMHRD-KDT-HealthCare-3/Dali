@@ -83,7 +83,7 @@ const Chat = () => {
   const navigate  = useNavigate()
   const location  = useLocation()
   const { isDark } = useTheme()
-  const { user, isAuthenticated } = useAuth()
+  const { user, isAuthenticated, authLoading } = useAuth()
   const bottomRef = useRef(null)
 
   const locState = location.state || {}
@@ -107,6 +107,11 @@ const Chat = () => {
 
   /* ── 첫 메시지 전송 여부 (빠른 선택지 숨김 트리거) ── */
   const [hasSentFirst, setHasSentFirst] = useState(false)
+
+  /* ── 음성 녹음 ── */
+  const [isRecording, setIsRecording]   = useState(false)
+  const mediaRecorderRef                 = useRef(null)
+  const audioChunksRef                   = useRef([])
 
   const VALID_EMOTIONS = new Set(['기쁨', '슬픔', '불안', '분노', '상처', '당황'])
 
@@ -136,8 +141,9 @@ const Chat = () => {
     }
   }
 
-  // 마운트 시 세션 복원 or 신규 시작
+  // 마운트 시 세션 복원 or 신규 시작 (authLoading 끝난 뒤 실행)
   useEffect(() => {
+    if (authLoading) return
     const saved = sessionStorage.getItem(STORAGE_KEY)
     if (saved) {
       try {
@@ -154,7 +160,7 @@ const Chat = () => {
       } catch {}
     }
     startSession(locState.emotion)
-  }, [])
+  }, [authLoading])
 
   /* ── 메시지 / 입력 상태 ── */
   const [messages, setMessages] = useState([])
@@ -235,6 +241,74 @@ const Chat = () => {
   }
 
   const handleSend = () => sendMessage(input)
+
+  /* ── 음성 전송 ── */
+  const sendAudio = async (blob) => {
+    if (isRisk) return
+    if (!hasSentFirst) setHasSentFirst(true)
+
+    const placeholderId = Date.now() + Math.random()
+    setMessages(prev => [...prev, { id: placeholderId, role: 'user', text: '🎤 음성 인식 중...', time: now(), read: false }])
+    setIsTyping(true)
+    try {
+      const formData = new FormData()
+      formData.append('audio', blob, 'recording.webm')
+      if (isAuthenticated && sessionIdRef.current) {
+        formData.append('session_id', String(sessionIdRef.current))
+      }
+      const res = await chatApi.sendAudio(formData)
+
+      // Node가 utterance를 반환하면 실제 전사 텍스트로 교체, 없으면 🎤 음성 메시지로 fallback
+      const displayText = res.utterance || '🎤 음성 메시지'
+      setMessages(prev => prev.map(m => m.id === placeholderId ? { ...m, text: displayText } : m))
+
+      if (res.is_risk) {
+        setIsRisk(true)
+        setSessionId(null)
+        sessionIdRef.current = null
+        addDali('지금 많이 힘드신 것 같아요. 혼자 버티지 않아도 돼요.\n\n📞 자살예방상담전화: 1393\n📞 정신건강위기상담전화: 1577-0199\n\n언제든 다시 찾아와 주세요 🌙')
+      } else {
+        addDali(res.reply || '...')
+      }
+    } catch {
+      setMessages(prev => prev.map(m => m.id === placeholderId ? { ...m, text: '🎤 음성 메시지' } : m))
+      addDali('죄송해요, 음성 전송에 실패했어요. 다시 시도해주세요.')
+    } finally {
+      setIsTyping(false)
+    }
+  }
+
+  /* ── 마이크 버튼 클릭 ── */
+  const handleMicClick = async () => {
+    if (isRisk) return
+
+    if (isRecording) {
+      mediaRecorderRef.current?.stop()
+      setIsRecording(false)
+      return
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const mediaRecorder = new MediaRecorder(stream)
+      audioChunksRef.current = []
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data)
+      }
+      mediaRecorder.onstop = () => {
+        const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
+        stream.getTracks().forEach(t => t.stop())
+        sendAudio(blob)
+      }
+
+      mediaRecorder.start()
+      mediaRecorderRef.current = mediaRecorder
+      setIsRecording(true)
+    } catch {
+      addDali('마이크 접근 권한이 필요해요. 브라우저 설정에서 허용해주세요.')
+    }
+  }
 
   // 현재 상황에 맞는 빠른 선택지
   const currentQuickReplies = getQuickReplies({
@@ -346,7 +420,12 @@ const Chat = () => {
           onChange={e => setInput(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && handleSend()}
         />
-        <button className="chat-mic" aria-label="음성">
+        <button
+          className={`chat-mic${isRecording ? ' chat-mic--recording' : ''}`}
+          onClick={handleMicClick}
+          aria-label={isRecording ? '녹음 중지' : '음성 입력'}
+          disabled={isRisk}
+        >
           <MicIcon />
         </button>
         <button className="chat-send" onClick={handleSend} aria-label="전송">
