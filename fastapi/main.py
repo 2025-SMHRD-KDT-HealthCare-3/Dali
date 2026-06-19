@@ -13,7 +13,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from services import emotion_router
+from routers import internal
 from services.emotion_model import load_model, is_loaded
 
 
@@ -22,11 +22,8 @@ from services.emotion_model import load_model, is_loaded
 # ═══════════════════════════════════════════════
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # 컨테이너 기동 시 v8 모델을 1회 로드해서 메모리에 올려둔다
-    # (요청마다 다시 로드하지 않도록 — 로드에 수초 걸리므로 매 요청마다 하면 안 됨)
     load_model()
     yield
-    # 종료 시 정리 작업 필요하면 yield 다음에 추가
 
 
 # ═══════════════════════════════════════════════
@@ -34,7 +31,7 @@ async def lifespan(app: FastAPI):
 # ═══════════════════════════════════════════════
 app = FastAPI(lifespan=lifespan)
 
-app.include_router(emotion_router.router)   # /emotion/analyze, /emotion/session
+app.include_router(internal.router)   # /internal/chat, /internal/stt
 
 
 # ═══════════════════════════════════════════════
@@ -42,6 +39,4 @@ app.include_router(emotion_router.router)   # /emotion/analyze, /emotion/session
 # ═══════════════════════════════════════════════
 @app.get("/health")
 def health_check():
-    # model_loaded까지 같이 보고 → 모델이 안 올라온 상태로
-    # healthy 처리되는 것을 docker-compose가 구분할 수 있게 함
     return {"status": "ok", "model_loaded": is_loaded()}
