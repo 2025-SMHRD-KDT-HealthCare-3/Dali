@@ -17,6 +17,9 @@ app.use(cookieParser());
 // JWT 인증에 막히면 헬스체크 실패
 app.get('/health', (req, res) => res.sendStatus(200));
 
+// 미디어 정적 서빙 — JWT 인증 라우트보다 앞에 등록 (audio/video 태그는 Authorization 헤더 불가)
+app.use('/api/media', express.static('/app/media'));
+
 app.use('/api', routes);
 
 app.use(errorHandler);
