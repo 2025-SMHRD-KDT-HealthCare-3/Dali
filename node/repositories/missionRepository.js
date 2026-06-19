@@ -1,7 +1,10 @@
 /*
  * missionRepository - missions 테이블
+ * - findById           : 미션 단건 조회 (소유자 검증용)
  * - findMissionsByUser : 사용자의 미션 목록 조회 (날짜 내림차순, 순번 오름차순)
  * - completeMission    : 미션 완료 처리 (is_completed = 'Y', completed_at 업데이트)
+ * - createMissions     : 미션 3개 일괄 저장 (세션 종료 시 FastAPI 결과 저장)
+ * - hasMissionsToday   : 오늘 미션 생성 여부 확인 (하루 1회 생성 중복 방지)
  */
 
 const pool = require('../config/db');

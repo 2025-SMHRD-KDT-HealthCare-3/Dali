@@ -12,13 +12,13 @@
  * 녹음 종료 시점이 이미 발화의 끝 → 디바운스 불필요 → STT 완료 즉시 FastAPI 호출
  *
  * [FastAPI 응답 형식]
- * { reply, risk: { risk_level, action } }
- * - risk_level: 'watch' | 'risk' | 'critical'
- * - watch: 저장/처리 없음, risk/critical: 세션 종료 + risk_events 저장
+ * { reply, is_crisis, response_text, emotion_scores }
+ * - is_crisis: true → 위기 감지 (response_text에 안전 응답 포함)
+ * - is_crisis: false → 일반 응답 (reply에 LLM 응답 포함)
  *
  * [위기 감지 처리]
- * FastAPI가 고위험 신호 감지 시 Node에서 세션 내 누적 횟수 집계 후 응답 분기
- * 누적 1~2회 → feedback / 3회 이상 → hotline(1577-0199)
+ * Node 1차 키워드 감지 → FastAPI LLM 최종 판단 (is_crisis)
+ * 세션 내 누적 1~2회 → feedback / 3회 → hotline(1577-0199) + 세션 종료
  */
 
 const axios = require('axios');
@@ -36,40 +36,34 @@ const RISK_KEYWORDS = require('../assets/riskKeywords');
 const upload = multer({ storage: multer.memoryStorage() });
 
 
-/*
- * handleRisk - 고위험 신호 감지 시 공통 처리
- *
- * 왜 별도 함수로 분리했나:
- * 텍스트(chatRespond)와 음성(chatAudio) 모두 위기 처리 로직이 동일하기 때문
- *
- * 처리 순서:
- * 1. 세션 강제 종료 (대화 중단)
- * 2. 현재 세션 내 누적 위기 횟수 조회 (세션 기준)
- * 3. risk_events 테이블에 이번 위기 기록
- * 4. 누적 횟수에 따라 프론트 응답 분기
- *    - 1~2회: 피드백 안내 (feedback)
- *    - 3회 이상: 전문기관 연결 (hotline)
- */
-async function handleRisk({ user_id, session_id, matched_category, res }) {
-  // 위기 감지 시 현재 세션을 즉시 종료하여 추가 대화 방지
-  if (session_id) await sessionRepo.endSession(session_id);
-
-  // 현재 세션 내 이전 위기 횟수 조회 — 세션 + 유저 기준으로 누적
+// 위기 이벤트 저장 + 3회 시 세션 종료 — 응답은 호출부에서 처리
+async function saveRiskEvent({ user_id, session_id, matched_category }) {
   const prevCount = await riskEventRepo.countBySessionId(session_id, user_id);
   const totalCount = prevCount + 1;
-  const action = totalCount >= 3 ? 'hotline' : 'feedback';
+  const action = totalCount === 3 ? 'hotline' : 'feedback';
+  await riskEventRepo.createRiskEvent({ user_id, session_id, matched_category, action_taken: action });
+  if (action === 'hotline' && session_id) await sessionRepo.endSession(session_id);
+  return action;
+}
 
-  // 이번 위기 이벤트를 기록 — action_taken은 항상 'hotline'으로 통일 저장
-  await riskEventRepo.createRiskEvent({ user_id, session_id, matched_category, action_taken: 'hotline' });
+/*
+ * handleRisk - 고위험 신호 감지 시 공통 처리 (저장 + 응답)
+ * - 1~2회: 세션 유지, feedback 응답
+ * - 3회: 세션 종료, hotline 응답
+ * - response_text: LLM이 생성한 응답 텍스트 (없으면 null)
+ */
+async function handleRisk({ user_id, session_id, matched_category, response_text, res }) {
+  const action = await saveRiskEvent({ user_id, session_id, matched_category });
 
   if (action === 'hotline') {
     return res.json({
       is_risk: true,
       action: 'hotline',
+      reply: response_text,
       hotline: { name: '정신건강 위기상담 전화', phone: '1577-0199' },
     });
   }
-  return res.json({ is_risk: true, action: 'feedback' });
+  return res.json({ is_risk: true, action: 'feedback', reply: response_text });
 }
 
 /*
@@ -128,7 +122,12 @@ async function chatRespond(req, res) {
   // 1차 키워드 감지 — 키워드가 있을 때만 LLM에 문맥 확인 요청
   // 키워드 없으면 has_risk_keyword: false → LLM은 위기 체크 없이 일반 답변
   // 키워드 있으면 has_risk_keyword: true → LLM이 전체 문맥 보고 실제 위기 여부 최종 판단
-  const hasRiskKeyword = RISK_KEYWORDS.some(keyword => utterance.includes(keyword));
+  // 공백 제거 후 매칭 — "죽고 싶어" → "죽고싶어" 로 정규화해서 띄어쓰기 변형 대응
+  const normalized = utterance.replace(/\s/g, '');
+  const hasRiskKeyword = RISK_KEYWORDS.some(keyword => normalized.includes(keyword));
+  const confirmed_count = hasRiskKeyword
+    ? await riskEventRepo.countBySessionId(session_id, req.user.user_id)
+    : 0;
 
   let fastapiRes;
   try {
@@ -139,6 +138,7 @@ async function chatRespond(req, res) {
         user_id:              req.user.user_id,
         utterance,
         has_risk_keyword:     hasRiskKeyword,
+        confirmed_count,
         persona:              user?.persona || null,
         selected_emotion:     session?.selected_emotion || null,
         // history: role/content 형식으로 변환해서 전달
@@ -156,22 +156,16 @@ async function chatRespond(req, res) {
       { headers: { 'X-Internal-API-Key': process.env.INTERNAL_API_KEY } }
     );
   } catch {
+    // 키워드 감지 상태에서 LLM 통신 장애 → 카운트만 올리고 오류 반환
+    if (hasRiskKeyword && session_id) {
+      await saveRiskEvent({ user_id: req.user.user_id, session_id, matched_category: '통신오류' });
+    }
     return res.status(502).json({ code: 'BAD_GATEWAY', message: 'AI 응답에 실패했습니다. 잠시 후 다시 시도해주세요.' });
   }
 
-  const { reply, risk, emotion_scores } = fastapiRes.data;
+  const { reply, is_crisis, response_text, emotion_scores } = fastapiRes.data;
 
-  // risk_level이 'risk' 또는 'critical'일 때만 위기 처리 — 'watch'는 저장/처리 없음
-  if (risk?.risk_level === 'risk' || risk?.risk_level === 'critical') {
-    return handleRisk({
-      user_id: req.user.user_id,
-      session_id,
-      matched_category: risk.action || '기타',
-      res,
-    });
-  }
-
-  // FastAPI 응답 후 DB 저장 — 이 순서가 중요
+  // FastAPI 응답 후 DB 저장 — is_crisis 여부와 관계없이 동일하게 저장
   // 사용자 발화를 먼저 저장해 log_id를 확보한 뒤, 그 log_id로 감정점수를 연결
   const [[{ turn_idx }]] = await pool.query(
     'SELECT COALESCE(MAX(turn_idx), 0) + 1 AS turn_idx FROM chat_logs WHERE session_id = ?',
@@ -188,21 +182,33 @@ async function chatRespond(req, res) {
   if (emotion_scores) {
     const { joy_score, sad_score, anxiety_score, anger_score, hurt_score, embarrass_score } = emotion_scores;
     await pool.query(
-      'INSERT INTO chat_analyses (log_id, joy_score, sad_score, anxiety_score, anger_score, hurt_score, embarrass_score) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [userLogResult.insertId, joy_score, sad_score, anxiety_score, anger_score, hurt_score, embarrass_score]
+      'INSERT INTO chat_analyses (user_id, log_id, joy_score, sad_score, anxiety_score, anger_score, hurt_score, embarrass_score) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [req.user.user_id, userLogResult.insertId, joy_score, sad_score, anxiety_score, anger_score, hurt_score, embarrass_score]
     );
   }
 
-  // AI 답변 저장 — fastapiRes에서 온 데이터이므로 speaker는 항상 'assistant'
-  if (reply) {
+  // AI 답변 저장 — is_crisis 시 response_text, 일반 시 reply
+  const assistantReply = is_crisis ? response_text : reply;
+  if (assistantReply) {
     const [[{ ai_turn_idx }]] = await pool.query(
       'SELECT COALESCE(MAX(turn_idx), 0) + 1 AS ai_turn_idx FROM chat_logs WHERE session_id = ?',
       [session_id]
     );
     await pool.query(
       'INSERT INTO chat_logs (user_id, session_id, speaker, utterance, turn_idx) VALUES (?, ?, ?, ?, ?)',
-      [req.user.user_id, session_id, 'assistant', reply, ai_turn_idx]
+      [req.user.user_id, session_id, 'assistant', assistantReply, ai_turn_idx]
     );
+  }
+
+  // LLM이 is_crisis: true 반환 시 위기 처리 (DB 저장 후 호출)
+  if (is_crisis) {
+    return handleRisk({
+      user_id: req.user.user_id,
+      session_id,
+      matched_category: '위기감지',
+      response_text,
+      res,
+    });
   }
 
   return res.json({ reply, is_risk: false });
@@ -259,9 +265,18 @@ async function chatAudio(req, res) {
       emotionAlertRepo.findUnconfirmedByUserId(req.user.user_id),
       summaryRepo.findRecentByUserId(req.user.user_id, 2),
     ]);
+
+    // 세션 존재 여부 + 소유자 검증 (IDOR 방어)
+    if (!session || session.user_id !== req.user.user_id) {
+      return res.status(403).json({ code: 'FORBIDDEN', message: '접근 권한이 없습니다.' });
+    }
   }
 
-  const hasRiskKeyword = RISK_KEYWORDS.some(keyword => utterance.includes(keyword));
+  const normalized = utterance.replace(/\s/g, '');
+  const hasRiskKeyword = RISK_KEYWORDS.some(keyword => normalized.includes(keyword));
+  const confirmed_count = hasRiskKeyword && req.user && session_id
+    ? await riskEventRepo.countBySessionId(session_id, req.user.user_id)
+    : 0;
 
   let fastapiRes;
   try {
@@ -272,6 +287,7 @@ async function chatAudio(req, res) {
         user_id:              req.user?.user_id || null,
         utterance,
         has_risk_keyword:     hasRiskKeyword,
+        confirmed_count,
         persona:              user?.persona || null,
         selected_emotion:     session?.selected_emotion || null,
         history:              messages.map(m => ({ role: m.role, content: m.content })),
@@ -287,22 +303,16 @@ async function chatAudio(req, res) {
       { headers: { 'X-Internal-API-Key': process.env.INTERNAL_API_KEY } }
     );
   } catch {
+    // 키워드 감지 상태에서 LLM 통신 장애 → 카운트만 올리고 오류 반환
+    if (hasRiskKeyword && req.user && session_id) {
+      await saveRiskEvent({ user_id: req.user.user_id, session_id, matched_category: '통신오류' });
+    }
     return res.status(502).json({ code: 'BAD_GATEWAY', message: 'AI 응답에 실패했습니다. 잠시 후 다시 시도해주세요.' });
   }
 
-  const { reply, risk, emotion_scores } = fastapiRes.data;
+  const { reply, is_crisis, response_text, emotion_scores } = fastapiRes.data;
 
-  // risk_level이 'risk' 또는 'critical'일 때만 위기 처리 — 'watch'는 저장/처리 없음
-  if (req.user && session_id && (risk?.risk_level === 'risk' || risk?.risk_level === 'critical')) {
-    return handleRisk({
-      user_id: req.user.user_id,
-      session_id,
-      matched_category: risk.action || '기타',
-      res,
-    });
-  }
-
-  // 회원 + 세션이 있을 때만 DB 저장 (텍스트와 동일한 순서)
+  // 회원 + 세션이 있을 때만 DB 저장 — is_crisis 여부와 관계없이 동일하게 저장
   if (req.user && session_id) {
     const [[{ turn_idx }]] = await pool.query(
       'SELECT COALESCE(MAX(turn_idx), 0) + 1 AS turn_idx FROM chat_logs WHERE session_id = ?',
@@ -319,21 +329,34 @@ async function chatAudio(req, res) {
     if (emotion_scores) {
       const { joy_score, sad_score, anxiety_score, anger_score, hurt_score, embarrass_score } = emotion_scores;
       await pool.query(
-        'INSERT INTO chat_analyses (log_id, joy_score, sad_score, anxiety_score, anger_score, hurt_score, embarrass_score) VALUES (?, ?, ?, ?, ?, ?, ?)',
-        [userLogResult.insertId, joy_score, sad_score, anxiety_score, anger_score, hurt_score, embarrass_score]
+        'INSERT INTO chat_analyses (user_id, log_id, joy_score, sad_score, anxiety_score, anger_score, hurt_score, embarrass_score) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        [req.user.user_id, userLogResult.insertId, joy_score, sad_score, anxiety_score, anger_score, hurt_score, embarrass_score]
       );
     }
 
-    if (reply) {
+    // AI 답변 저장 — is_crisis 시 response_text, 일반 시 reply
+    const assistantReply = is_crisis ? response_text : reply;
+    if (assistantReply) {
       const [[{ ai_turn_idx }]] = await pool.query(
         'SELECT COALESCE(MAX(turn_idx), 0) + 1 AS ai_turn_idx FROM chat_logs WHERE session_id = ?',
         [session_id]
       );
       await pool.query(
         'INSERT INTO chat_logs (user_id, session_id, speaker, utterance, turn_idx) VALUES (?, ?, ?, ?, ?)',
-        [req.user.user_id, session_id, 'assistant', reply, ai_turn_idx]
+        [req.user.user_id, session_id, 'assistant', assistantReply, ai_turn_idx]
       );
     }
+  }
+
+  // LLM이 is_crisis: true 반환 시 위기 처리 (DB 저장 후 호출)
+  if (req.user && session_id && is_crisis) {
+    return handleRisk({
+      user_id: req.user.user_id,
+      session_id,
+      matched_category: '위기감지',
+      response_text,
+      res,
+    });
   }
 
   return res.json({ reply, is_risk: false });
