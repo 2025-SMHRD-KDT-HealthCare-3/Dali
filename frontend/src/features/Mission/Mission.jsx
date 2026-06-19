@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import './mission.css'
 import daliImg      from '../../assets/public/조개탑쌓기.png'
+import shellVideo   from '../../assets/public/수정4.mp4'
 import pl1Dark  from '../../assets/dark/플레이리스트1.png'
 import pl2Dark  from '../../assets/dark/플레이리스트2.png'
 import pl1Light from '../../assets/light/플레이리스트1라이트.png'
@@ -128,7 +129,14 @@ const Mission = () => {
             )}
           </div>
 
-          <img src={daliImg} alt="달리" className="stage-dali-img" />
+          <video
+            src={shellVideo}
+            className="stage-dali-img"
+            autoPlay
+            loop
+            muted
+            playsInline
+          />
         </div>
 
         {toastVisible && (
