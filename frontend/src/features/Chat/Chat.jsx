@@ -108,6 +108,10 @@ const Chat = () => {
   /* ── 첫 메시지 전송 여부 (빠른 선택지 숨김 트리거) ── */
   const [hasSentFirst, setHasSentFirst] = useState(false)
 
+  /* ── 텍스트 디바운스 ── */
+  const [isUserTyping, setIsUserTyping] = useState(false)
+  const debounceRef                      = useRef(null)
+
   /* ── 음성 녹음 ── */
   const [isRecording, setIsRecording]   = useState(false)
   const mediaRecorderRef                 = useRef(null)
@@ -240,7 +244,26 @@ const Chat = () => {
     }
   }
 
-  const handleSend = () => sendMessage(input)
+  const handleSend = () => {
+    clearTimeout(debounceRef.current)
+    setIsUserTyping(false)
+    sendMessage(input)
+  }
+
+  const handleInputChange = (e) => {
+    const val = e.target.value
+    setInput(val)
+    setIsUserTyping(val.trim().length > 0)
+
+    clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => {
+      if (val.trim()) {
+        setIsUserTyping(false)
+        sendMessage(val.trim())
+        setInput('')
+      }
+    }, 1500)
+  }
 
   /* ── 음성 전송 ── */
   const sendAudio = async (blob) => {
@@ -389,6 +412,13 @@ const Chat = () => {
           />
         ))}
 
+        {isUserTyping && (
+          <div className="chat-user-typing">
+            <span />
+            <span />
+            <span />
+          </div>
+        )}
         {isTyping && <TypingBubble />}
         <div ref={bottomRef} />
       </div>
@@ -417,7 +447,7 @@ const Chat = () => {
           type="text"
           placeholder="메시지를 입력해 주세요..."
           value={input}
-          onChange={e => setInput(e.target.value)}
+          onChange={handleInputChange}
           onKeyDown={e => e.key === 'Enter' && handleSend()}
         />
         <button
