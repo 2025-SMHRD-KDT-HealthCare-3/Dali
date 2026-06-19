@@ -108,6 +108,11 @@ const Chat = () => {
   /* ── 첫 메시지 전송 여부 (빠른 선택지 숨김 트리거) ── */
   const [hasSentFirst, setHasSentFirst] = useState(false)
 
+  /* ── 음성 녹음 ── */
+  const [isRecording, setIsRecording]   = useState(false)
+  const mediaRecorderRef                 = useRef(null)
+  const audioChunksRef                   = useRef([])
+
   const VALID_EMOTIONS = new Set(['기쁨', '슬픔', '불안', '분노', '상처', '당황'])
 
   const startSession = async (emotionId) => {
@@ -236,6 +241,66 @@ const Chat = () => {
 
   const handleSend = () => sendMessage(input)
 
+  /* ── 음성 전송 ── */
+  const sendAudio = async (blob) => {
+    if (isRisk) return
+    if (!hasSentFirst) setHasSentFirst(true)
+    addUser('🎤 음성 메시지')
+    setIsTyping(true)
+    try {
+      const formData = new FormData()
+      formData.append('audio', blob, 'recording.webm')
+      if (isAuthenticated && sessionIdRef.current) {
+        formData.append('session_id', String(sessionIdRef.current))
+      }
+      const res = await chatApi.sendAudio(formData)
+      if (res.is_risk) {
+        setIsRisk(true)
+        setSessionId(null)
+        sessionIdRef.current = null
+        addDali('지금 많이 힘드신 것 같아요. 혼자 버티지 않아도 돼요.\n\n📞 자살예방상담전화: 1393\n📞 정신건강위기상담전화: 1577-0199\n\n언제든 다시 찾아와 주세요 🌙')
+      } else {
+        addDali(res.reply || '...')
+      }
+    } catch {
+      addDali('죄송해요, 음성 전송에 실패했어요. 다시 시도해주세요.')
+    } finally {
+      setIsTyping(false)
+    }
+  }
+
+  /* ── 마이크 버튼 클릭 ── */
+  const handleMicClick = async () => {
+    if (isRisk) return
+
+    if (isRecording) {
+      mediaRecorderRef.current?.stop()
+      setIsRecording(false)
+      return
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const mediaRecorder = new MediaRecorder(stream)
+      audioChunksRef.current = []
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data)
+      }
+      mediaRecorder.onstop = () => {
+        const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
+        stream.getTracks().forEach(t => t.stop())
+        sendAudio(blob)
+      }
+
+      mediaRecorder.start()
+      mediaRecorderRef.current = mediaRecorder
+      setIsRecording(true)
+    } catch {
+      addDali('마이크 접근 권한이 필요해요. 브라우저 설정에서 허용해주세요.')
+    }
+  }
+
   // 현재 상황에 맞는 빠른 선택지
   const currentQuickReplies = getQuickReplies({
     greetingType,
@@ -346,7 +411,12 @@ const Chat = () => {
           onChange={e => setInput(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && handleSend()}
         />
-        <button className="chat-mic" aria-label="음성">
+        <button
+          className={`chat-mic${isRecording ? ' chat-mic--recording' : ''}`}
+          onClick={handleMicClick}
+          aria-label={isRecording ? '녹음 중지' : '음성 입력'}
+          disabled={isRisk}
+        >
           <MicIcon />
         </button>
         <button className="chat-send" onClick={handleSend} aria-label="전송">

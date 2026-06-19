@@ -70,7 +70,7 @@ class ChatRequest(BaseModel):
     selected_emotion:         str | None = None
     history:                  list[dict] = []
     current_emotion_analysis: EmotionAnalysis | None = None
-    alert_context:            AlertContext | None = None
+    alert_context:            list[AlertContext] | None = None
     recent_summaries:         list[str] | None = None
 
 
@@ -135,7 +135,7 @@ async def internal_chat(req: ChatRequest):
         req.current_emotion_analysis.model_dump() if req.current_emotion_analysis else None
     )
     alert_ctx = (
-        req.alert_context.model_dump() if req.alert_context else None
+        [a.model_dump() for a in req.alert_context] if req.alert_context else None
     )
 
     try:

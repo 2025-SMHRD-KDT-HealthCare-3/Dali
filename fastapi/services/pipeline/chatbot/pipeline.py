@@ -58,7 +58,7 @@ async def build_chat_reply(
     emotion: str | None = None,
     history: list[dict] | None = None,
     current_emotion_analysis: dict | None = None,
-    alert_context: dict | None = None,
+    alert_context: list[dict] | None = None,
     recent_summaries: list[str] | None = None,
 ) -> str:
     """LLM에 메시지를 조립하고 응답 텍스트를 반환.
@@ -100,7 +100,7 @@ async def build_chat_reply(
 def _build_context_block(
     emotion: str | None,
     current_emotion_analysis: dict | None,
-    alert_context: dict | None,
+    alert_context: list[dict] | None,
     recent_summaries: list[str] | None,
 ) -> str:
     """시스템 메시지에 추가할 동적 컨텍스트 블록."""
@@ -119,15 +119,21 @@ def _build_context_block(
             f"감정 점수: {score_str}"
         )
 
-    if alert_context and alert_context.get("alert_detected"):
-        alert_emotion = alert_context.get("alert_emotion", "")
-        alert_reason = alert_context.get("alert_reason", "")
-        parts.append(
-            f"\n\n[감정주의신호 — 기본 페르소나 유지, 응답 강도만 조절]\n"
-            f"반복 감정: {alert_emotion}\n"
-            f"상황: {alert_reason}\n"
-            "안정감을 강화하고, 감정을 가볍게 넘기지 말 것. 진단하듯 표현하지 말 것."
-        )
+    if alert_context:
+        detected = [a for a in alert_context if a.get("alert_detected")]
+        if detected:
+            emotions = ", ".join(
+                a["alert_emotion"] for a in detected if a.get("alert_emotion")
+            )
+            reasons = "\n".join(
+                f"- {a['alert_reason']}" for a in detected if a.get("alert_reason")
+            )
+            parts.append(
+                f"\n\n[감정주의신호 — 기본 페르소나 유지, 응답 강도만 조절]\n"
+                f"반복 감정: {emotions}\n"
+                f"상황:\n{reasons}\n"
+                "안정감을 강화하고, 감정을 가볍게 넘기지 말 것. 진단하듯 표현하지 말 것."
+            )
 
     if recent_summaries:
         summaries_str = "\n".join(f"- {s}" for s in recent_summaries)
