@@ -126,15 +126,18 @@ async function endSession(req, res) {
     joy_score, sad_score, anxiety_score, anger_score, hurt_score, embarrass_score, dominant_emotion,
   });
 
-  // reports / summaries / missions 동시에 저장
-  await Promise.all([
+  // 미션은 하루 첫 세션에만 생성, 리포트/요약은 세션마다 생성
+  const missionsExist = await missionRepo.hasMissionsToday(req.user.user_id);
+
+  const saveJobs = [
     reportRepo.createReport({ user_id: req.user.user_id, session_id: id, session_analysis_id: sessionAnalysisId, one_line_review }),
     summaryRepo.createSummary({ user_id: req.user.user_id, session_id: id, context_summary }),
-    missionRepo.createMissions(req.user.user_id, id, missions.map((m, i) => ({
-      mission_seq: i + 1,
-      mission_content: m.title,
-    }))),
-  ]);
+  ];
+  if (!missionsExist) saveJobs.push(missionRepo.createMissions(req.user.user_id, id, missions.map((m, i) => ({
+    mission_seq: i + 1,
+    mission_content: m.title,
+  }))));
+  await Promise.all(saveJobs);
 
   // 주요 감정이 ALERT 목록에 있고 5일 연속이면 감정 주의 신호 자동 생성
   if (dominant_emotion && ALERT_EMOTIONS.includes(dominant_emotion)) {

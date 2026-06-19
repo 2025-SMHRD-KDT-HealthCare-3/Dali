@@ -38,4 +38,12 @@ async function createMissions(user_id, session_id, missions) {
   );
 }
 
-module.exports = { findById, createMissions, findMissionsByUser, completeMission };
+async function hasMissionsToday(user_id) {
+  const [[{ count }]] = await pool.query(
+    'SELECT COUNT(*) AS count FROM missions WHERE user_id = ? AND mission_date = CURDATE()',
+    [user_id]
+  );
+  return count > 0;
+}
+
+module.exports = { findById, createMissions, findMissionsByUser, completeMission, hasMissionsToday };

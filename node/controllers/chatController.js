@@ -145,7 +145,12 @@ async function chatRespond(req, res) {
         history:              messages.map(m => ({ role: m.role, content: m.content })),
         // current_emotion_analysis: 감정 모델 연동 전까지 null
         current_emotion_analysis: null,
-        alert_context:        alerts,
+        alert_context:        alerts.slice(0, 2).map(a => ({
+          alert_detected: true,
+          alert_emotion:  a.alerted_emotion,
+          alert_reason:   a.alert_reason,
+          alert_message:  `최근 며칠 동안 ${a.alerted_emotion} 감정이 자주 나타나고 있어요.`,
+        })),
         recent_summaries:     summaries,
       },
       { headers: { 'X-Internal-API-Key': process.env.INTERNAL_API_KEY } }
@@ -271,7 +276,12 @@ async function chatAudio(req, res) {
         selected_emotion:     session?.selected_emotion || null,
         history:              messages.map(m => ({ role: m.role, content: m.content })),
         current_emotion_analysis: null,
-        alert_context:        alerts,
+        alert_context:        alerts.slice(0, 2).map(a => ({
+          alert_detected: true,
+          alert_emotion:  a.alerted_emotion,
+          alert_reason:   a.alert_reason,
+          alert_message:  `최근 며칠 동안 ${a.alerted_emotion} 감정이 자주 나타나고 있어요.`,
+        })),
         recent_summaries:     summaries,
       },
       { headers: { 'X-Internal-API-Key': process.env.INTERNAL_API_KEY } }
