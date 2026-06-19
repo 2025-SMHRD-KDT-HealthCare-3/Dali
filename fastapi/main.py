@@ -20,58 +20,49 @@ from fastapi import Depends, FastAPI, File, HTTPException, Path, UploadFile
 from pydantic import BaseModel
 
 from middleware.auth import require_internal_key
+from services.emotion_model import EMOTIONS, load_model, is_loaded, predict_emotions
 from services.pipeline.chatbot.pipeline import build_chat_reply
 from services.pipeline.chatbot.risk_gate import detect_risk_with_context
 from services.pipeline.chatbot.safety_response import get_safety_response
 from services.pipeline.report.pipeline import analyze_session
+from utils.intensity_scaler import scale_by_intensity
 
 
-app = FastAPI(title="Dali LLM API")
+# ── 앱 생성 (컨테이너 기동 시 모델 1회 로드) ──────────────────────────────────────
 
-
-# ── 헬스체크 ───────────────────────────────────────────────────────────────────
-# docker-compose.yml -> service_healthy 체크용 엔드포인트 추가
-#
-# 파일 구성:
-#   [구간 1] import
-#   [구간 2] lifespan — 컨테이너 기동 시 모델 1회 로드
-#   [구간 3] 앱 생성 / 라우터 등록
-#   [구간 4] 헬스체크 엔드포인트
-
-# ═══════════════════════════════════════════════
-# [구간 1] import
-# ═══════════════════════════════════════════════
-from contextlib import asynccontextmanager
-
-from fastapi import FastAPI
-
-from routers import internal
-from services.emotion_model import load_model, is_loaded
-
-
-# ═══════════════════════════════════════════════
-# [구간 2] lifespan — 컨테이너 기동 시 모델 1회 로드
-# ═══════════════════════════════════════════════
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     load_model()
     yield
 
 
-# ═══════════════════════════════════════════════
-# [구간 3] 앱 생성 / 라우터 등록
-# ═══════════════════════════════════════════════
-app = FastAPI(lifespan=lifespan)
-
-app.include_router(internal.router)   # /internal/chat, /internal/stt
+app = FastAPI(title="Dali LLM API", lifespan=lifespan)
 
 
-# ═══════════════════════════════════════════════
-# [구간 4] 헬스체크
-# ═══════════════════════════════════════════════
+_COLUMN_MAP = {
+    "기쁨": "joy_score",   "슬픔": "sad_score",   "불안": "anxiety_score",
+    "분노": "anger_score", "상처": "hurt_score",   "당황": "embarrass_score",
+}
+
+
+def _get_scores(utterance: str, history: list[dict]) -> dict:
+    """발화 1개 감정분석 — risk/watch/none 모든 분기에서 공통으로 필요."""
+    prev_text = next(
+        (m.get("content") for m in reversed(history) if m.get("role") == "user"),
+        None,
+    )
+    raw = predict_emotions(utterance, prev_text)
+    scores = scale_by_intensity(raw, utterance).scores_after
+    return {_COLUMN_MAP[e]: scores[e] for e in EMOTIONS}
+
+
+# ── 헬스체크 ───────────────────────────────────────────────────────────────────
+
 @app.get("/health")
 def health_check():
-    return {"status": "ok"}
+    # model_loaded까지 같이 보고 → 모델이 안 올라온 상태로
+    # healthy 처리되는 것을 docker-compose가 구분할 수 있게 함
+    return {"status": "ok", "model_loaded": is_loaded()}
 
 
 # ── 요청 스키마 ────────────────────────────────────────────────────────────────
@@ -135,12 +126,16 @@ async def internal_chat(req: ChatRequest):
     """Node.js에서 사용자 발화를 받아 LLM 응답을 반환.
 
     처리 순서:
+      0) 감정분석 — risk/watch/none 모든 분기에서 공통으로 필요하므로 가장 먼저 계산
       1) risk_gate — 2단계 위험 감지 (키워드 → LLM 문맥 판단)
       2) risk/critical → 고정 안전 응답 반환
       3) watch → 안전 확인 질문 반환
       4) none → 페르소나 + 감정 분석 + alert 컨텍스트 기반 LLM 응답 생성
     """
     utterance = req.utterance or ""
+
+    # ── 감정분석 (모든 분기 공통) ─────────────────────────────────────────────
+    col_scores = _get_scores(utterance, req.history)
 
     # ── 위험 감지 ──────────────────────────────────────────────────────────────
     risk = await detect_risk_with_context(utterance, req.history)
@@ -155,6 +150,7 @@ async def internal_chat(req: ChatRequest):
                 "action": risk["matched_category"],
                 "matched_category": risk["matched_category"],
             },
+            **col_scores,
         }
 
     if risk_level == "watch":
@@ -166,6 +162,7 @@ async def internal_chat(req: ChatRequest):
                 "action": None,
                 "matched_category": risk["matched_category"],
             },
+            **col_scores,
         }
 
     # ── LLM 응답 생성 ──────────────────────────────────────────────────────────
@@ -189,10 +186,6 @@ async def internal_chat(req: ChatRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"LLM 호출 실패: {e}")
 
-    # 감정 점수 — Node 감정 모델 연동 전까지 0.0 유지 (chat_analyses NOT NULL 대응)
-    _STUB = {"joy_score": 0.0, "sad_score": 0.0, "anxiety_score": 0.0,
-             "anger_score": 0.0, "hurt_score": 0.0, "embarrass_score": 0.0}
-
     return {
         "reply": reply,
         "risk": {
@@ -201,7 +194,7 @@ async def internal_chat(req: ChatRequest):
             "action": None,
             "matched_category": None,
         },
-        **_STUB,
+        **col_scores,
     }
 
 
@@ -240,8 +233,3 @@ async def analyze_session_endpoint(
         raise HTTPException(status_code=500, detail=f"세션 분석 실패: {e}")
 
     return result
-
-    # model_loaded까지 같이 보고 → 모델이 안 올라온 상태로
-    # healthy 처리되는 것을 docker-compose가 구분할 수 있게 함
-
-    return {"status": "ok", "model_loaded": is_loaded()}
