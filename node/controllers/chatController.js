@@ -12,12 +12,13 @@
  * 녹음 종료 시점이 이미 발화의 끝 → 디바운스 불필요 → STT 완료 즉시 FastAPI 호출
  *
  * [FastAPI 응답 형식]
- * { reply, is_crisis, response_text, emotion_scores }
- * - is_crisis: true → 위기 감지 (response_text에 안전 응답 포함)
- * - is_crisis: false → 일반 응답 (reply에 LLM 응답 포함)
+ * { reply, risk: { detected, risk_level, matched_category }, joy_score, sad_score, ... }
+ * - risk.detected: true → 위기 감지 (reply에 안전 응답 포함)
+ * - risk.detected: false → 일반 응답 (reply에 LLM 응답 포함)
+ * - 감정점수는 위기/일반 모두 개별 필드로 반환
  *
  * [위기 감지 처리]
- * Node 1차 키워드 감지 → FastAPI LLM 최종 판단 (is_crisis)
+ * Node 1차 키워드 감지 → FastAPI LLM 최종 판단 (risk.detected)
  * 세션 내 누적 1~2회 → feedback / 3회 → hotline(1577-0199) + 세션 종료
  */
 
@@ -163,9 +164,9 @@ async function chatRespond(req, res) {
     return res.status(502).json({ code: 'BAD_GATEWAY', message: 'AI 응답에 실패했습니다. 잠시 후 다시 시도해주세요.' });
   }
 
-  const { reply, is_crisis, response_text, emotion_scores } = fastapiRes.data;
+  const { reply, risk, joy_score, sad_score, anxiety_score, anger_score, hurt_score, embarrass_score } = fastapiRes.data;
 
-  // FastAPI 응답 후 DB 저장 — is_crisis 여부와 관계없이 동일하게 저장
+  // FastAPI 응답 후 DB 저장 — 위기 여부와 관계없이 동일하게 저장
   // 사용자 발화를 먼저 저장해 log_id를 확보한 뒤, 그 log_id로 감정점수를 연결
   const [[{ turn_idx }]] = await pool.query(
     'SELECT COALESCE(MAX(turn_idx), 0) + 1 AS turn_idx FROM chat_logs WHERE session_id = ?',
@@ -178,35 +179,31 @@ async function chatRespond(req, res) {
     [req.user.user_id, session_id, 'user', utterance, turn_idx]
   );
 
-  // 감정점수 저장 — FastAPI가 emotion_scores를 반환할 때만 저장 (감정 분석 모델 연동 후 채워짐)
-  if (emotion_scores) {
-    const { joy_score, sad_score, anxiety_score, anger_score, hurt_score, embarrass_score } = emotion_scores;
-    await pool.query(
-      'INSERT INTO chat_analyses (user_id, log_id, joy_score, sad_score, anxiety_score, anger_score, hurt_score, embarrass_score) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      [req.user.user_id, userLogResult.insertId, joy_score, sad_score, anxiety_score, anger_score, hurt_score, embarrass_score]
-    );
-  }
+  // 감정점수 저장 — FastAPI가 개별 필드로 반환 (위기/일반 모두 포함)
+  await pool.query(
+    'INSERT INTO chat_analyses (user_id, log_id, joy_score, sad_score, anxiety_score, anger_score, hurt_score, embarrass_score) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    [req.user.user_id, userLogResult.insertId, joy_score ?? 0, sad_score ?? 0, anxiety_score ?? 0, anger_score ?? 0, hurt_score ?? 0, embarrass_score ?? 0]
+  );
 
-  // AI 답변 저장 — is_crisis 시 response_text, 일반 시 reply
-  const assistantReply = is_crisis ? response_text : reply;
-  if (assistantReply) {
+  // AI 답변 저장 — 위기/일반 모두 reply 필드 사용
+  if (reply) {
     const [[{ ai_turn_idx }]] = await pool.query(
       'SELECT COALESCE(MAX(turn_idx), 0) + 1 AS ai_turn_idx FROM chat_logs WHERE session_id = ?',
       [session_id]
     );
     await pool.query(
       'INSERT INTO chat_logs (user_id, session_id, speaker, utterance, turn_idx) VALUES (?, ?, ?, ?, ?)',
-      [req.user.user_id, session_id, 'assistant', assistantReply, ai_turn_idx]
+      [req.user.user_id, session_id, 'assistant', reply, ai_turn_idx]
     );
   }
 
-  // LLM이 is_crisis: true 반환 시 위기 처리 (DB 저장 후 호출)
-  if (is_crisis) {
+  // FastAPI가 위기 감지 시 위기 처리 (DB 저장 후 호출)
+  if (risk?.detected) {
     return handleRisk({
       user_id: req.user.user_id,
       session_id,
-      matched_category: '위기감지',
-      response_text,
+      matched_category: risk.matched_category || '위기감지',
+      response_text: reply,
       res,
     });
   }
@@ -310,9 +307,9 @@ async function chatAudio(req, res) {
     return res.status(502).json({ code: 'BAD_GATEWAY', message: 'AI 응답에 실패했습니다. 잠시 후 다시 시도해주세요.' });
   }
 
-  const { reply, is_crisis, response_text, emotion_scores } = fastapiRes.data;
+  const { reply, risk, joy_score, sad_score, anxiety_score, anger_score, hurt_score, embarrass_score } = fastapiRes.data;
 
-  // 회원 + 세션이 있을 때만 DB 저장 — is_crisis 여부와 관계없이 동일하게 저장
+  // 회원 + 세션이 있을 때만 DB 저장 — 위기 여부와 관계없이 동일하게 저장
   if (req.user && session_id) {
     const [[{ turn_idx }]] = await pool.query(
       'SELECT COALESCE(MAX(turn_idx), 0) + 1 AS turn_idx FROM chat_logs WHERE session_id = ?',
@@ -325,41 +322,37 @@ async function chatAudio(req, res) {
       [req.user.user_id, session_id, 'user', utterance, turn_idx]
     );
 
-    // 감정점수 저장 — FastAPI가 emotion_scores를 반환할 때만 저장 (감정 분석 모델 연동 후 채워짐)
-    if (emotion_scores) {
-      const { joy_score, sad_score, anxiety_score, anger_score, hurt_score, embarrass_score } = emotion_scores;
-      await pool.query(
-        'INSERT INTO chat_analyses (user_id, log_id, joy_score, sad_score, anxiety_score, anger_score, hurt_score, embarrass_score) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-        [req.user.user_id, userLogResult.insertId, joy_score, sad_score, anxiety_score, anger_score, hurt_score, embarrass_score]
-      );
-    }
+    // 감정점수 저장 — FastAPI가 개별 필드로 반환 (위기/일반 모두 포함)
+    await pool.query(
+      'INSERT INTO chat_analyses (user_id, log_id, joy_score, sad_score, anxiety_score, anger_score, hurt_score, embarrass_score) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [req.user.user_id, userLogResult.insertId, joy_score ?? 0, sad_score ?? 0, anxiety_score ?? 0, anger_score ?? 0, hurt_score ?? 0, embarrass_score ?? 0]
+    );
 
-    // AI 답변 저장 — is_crisis 시 response_text, 일반 시 reply
-    const assistantReply = is_crisis ? response_text : reply;
-    if (assistantReply) {
+    // AI 답변 저장 — 위기/일반 모두 reply 필드 사용
+    if (reply) {
       const [[{ ai_turn_idx }]] = await pool.query(
         'SELECT COALESCE(MAX(turn_idx), 0) + 1 AS ai_turn_idx FROM chat_logs WHERE session_id = ?',
         [session_id]
       );
       await pool.query(
         'INSERT INTO chat_logs (user_id, session_id, speaker, utterance, turn_idx) VALUES (?, ?, ?, ?, ?)',
-        [req.user.user_id, session_id, 'assistant', assistantReply, ai_turn_idx]
+        [req.user.user_id, session_id, 'assistant', reply, ai_turn_idx]
       );
     }
   }
 
-  // LLM이 is_crisis: true 반환 시 위기 처리 (DB 저장 후 호출)
-  if (req.user && session_id && is_crisis) {
+  // FastAPI가 위기 감지 시 위기 처리 (DB 저장 후 호출)
+  if (req.user && session_id && risk?.detected) {
     return handleRisk({
       user_id: req.user.user_id,
       session_id,
-      matched_category: '위기감지',
-      response_text,
+      matched_category: risk.matched_category || '위기감지',
+      response_text: reply,
       res,
     });
   }
 
-  return res.json({ reply, is_risk: false });
+  return res.json({ reply, utterance, is_risk: false });
 }
 
 module.exports = { chatRespond, chatAudio, upload };
