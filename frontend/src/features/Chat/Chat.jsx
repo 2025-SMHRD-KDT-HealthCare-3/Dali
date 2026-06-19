@@ -214,7 +214,7 @@ const Chat = () => {
     setIsTyping(true)
 
     try {
-      const body = { message: trimmed }
+      const body = { utterance: trimmed }
       if (isAuthenticated && sessionIdRef.current) body.session_id = sessionIdRef.current
 
       const res = await chatApi.sendMessage(body)
