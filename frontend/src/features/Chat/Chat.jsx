@@ -83,7 +83,7 @@ const Chat = () => {
   const navigate  = useNavigate()
   const location  = useLocation()
   const { isDark } = useTheme()
-  const { user, isAuthenticated } = useAuth()
+  const { user, isAuthenticated, authLoading } = useAuth()
   const bottomRef = useRef(null)
 
   const locState = location.state || {}
@@ -141,8 +141,9 @@ const Chat = () => {
     }
   }
 
-  // 마운트 시 세션 복원 or 신규 시작
+  // 마운트 시 세션 복원 or 신규 시작 (authLoading 끝난 뒤 실행)
   useEffect(() => {
+    if (authLoading) return
     const saved = sessionStorage.getItem(STORAGE_KEY)
     if (saved) {
       try {
@@ -159,7 +160,7 @@ const Chat = () => {
       } catch {}
     }
     startSession(locState.emotion)
-  }, [])
+  }, [authLoading])
 
   /* ── 메시지 / 입력 상태 ── */
   const [messages, setMessages] = useState([])
@@ -245,7 +246,9 @@ const Chat = () => {
   const sendAudio = async (blob) => {
     if (isRisk) return
     if (!hasSentFirst) setHasSentFirst(true)
-    addUser('🎤 음성 메시지')
+
+    const placeholderId = Date.now() + Math.random()
+    setMessages(prev => [...prev, { id: placeholderId, role: 'user', text: '🎤 음성 인식 중...', time: now(), read: false }])
     setIsTyping(true)
     try {
       const formData = new FormData()
@@ -254,6 +257,11 @@ const Chat = () => {
         formData.append('session_id', String(sessionIdRef.current))
       }
       const res = await chatApi.sendAudio(formData)
+
+      // Node가 utterance를 반환하면 실제 전사 텍스트로 교체, 없으면 🎤 음성 메시지로 fallback
+      const displayText = res.utterance || '🎤 음성 메시지'
+      setMessages(prev => prev.map(m => m.id === placeholderId ? { ...m, text: displayText } : m))
+
       if (res.is_risk) {
         setIsRisk(true)
         setSessionId(null)
@@ -263,6 +271,7 @@ const Chat = () => {
         addDali(res.reply || '...')
       }
     } catch {
+      setMessages(prev => prev.map(m => m.id === placeholderId ? { ...m, text: '🎤 음성 메시지' } : m))
       addDali('죄송해요, 음성 전송에 실패했어요. 다시 시도해주세요.')
     } finally {
       setIsTyping(false)
