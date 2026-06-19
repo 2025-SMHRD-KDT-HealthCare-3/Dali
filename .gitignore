@@ -40,3 +40,6 @@ npm-debug.log*
 # 폴더 구조는 유지
 !/media/music/.gitkeep
 !/media/video/.gitkeep
+
+# 학습된 모델 가중치 (대용량, 외부 공유)
+/fastapi/model/kcelectra/model.safetensors

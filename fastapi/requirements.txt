@@ -1,8 +1,35 @@
-fastapi
-uvicorn[standard]
-python-dotenv
-openai
-transformers
-torch
-aiomysql
-python-multipart
+# ──────────────────────────────────────────────
+# FastAPI 서버 실행
+# ──────────────────────────────────────────────
+fastapi          # FastAPI 웹 프레임워크
+pydantic         # 요청/응답 스키마(BaseModel) — emotion_router.py에서 직접 사용
+                 # (fastapi 설치 시 따라오지만, 직접 import하므로 명시)
+uvicorn[standard]  # FastAPI 실행 서버 (standard: 웹소켓 등 추가 기능 포함)
+
+# ──────────────────────────────────────────────
+# 환경변수
+# ──────────────────────────────────────────────
+python-dotenv    # .env 파일에서 환경변수 로드
+
+# ──────────────────────────────────────────────
+# LLM (GPT-4o 호출 - LLM 담당자 코드와 같은 서버 사용)
+# ──────────────────────────────────────────────
+openai           # GPT-4o API 호출
+
+# ──────────────────────────────────────────────
+# KcELECTRA 모델 추론 (감정분석 - emotion_model.py, session_aggregator.py,
+#                      intensity_scaler.py, emotion_router.py)
+# ──────────────────────────────────────────────
+transformers==4.40.0
+# 버전 고정 이유:
+#   학습 코드(Colab)에서 transformers==4.40.0으로 학습됨
+#   버전이 다르면 토크나이저 동작이나 모델 로드 방식이
+#   달라질 수 있어 추론 결과가 달라질 수 있음
+#   반드시 학습 환경과 동일한 버전 사용
+
+torch            # PyTorch - 모델 추론 실행
+
+sentencepiece    # KcELECTRA 토크나이저 내부적으로 사용
+                 # 없으면 토크나이저 로드 시 에러 발생
+
+numpy            # 추론 결과 점수 계산 시 사용 (intensity_scaler, session_aggregator)
