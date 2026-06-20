@@ -20,7 +20,7 @@ from fastapi import Depends, FastAPI, File, HTTPException, Path, UploadFile
 
 from middleware.auth import require_internal_key
 from schemas import ChatRequest, SessionAnalyzeRequest
-from services.emotion_model import is_loaded, load_model
+from model_inference.emotion_model import is_loaded, load_model
 from services.pipeline.chatbot.orchestrator import run_chat
 from services.pipeline.report.pipeline import analyze_session
 

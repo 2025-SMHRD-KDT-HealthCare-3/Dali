@@ -11,7 +11,7 @@
 from fastapi import HTTPException
 
 from schemas import ChatRequest
-from services.emotion_model import EMOTIONS, predict_emotions
+from model_inference.emotion_model import EMOTIONS, predict_emotions
 from services.pipeline.chatbot.pipeline import build_chat_reply
 from services.pipeline.chatbot.risk_gate import detect_risk_with_context
 from services.pipeline.chatbot.safety_response import get_safety_response

@@ -5,7 +5,7 @@ analyze_session: 세션 대화 로그 + 감정 점수 → 요약·리뷰·미션
 
 from common.llm_client import call_llm
 from services.pipeline.mission.pipeline import generate_missions
-from services.session_aggregator import aggregate_session
+from model_inference.session_aggregator import aggregate_session
 
 # DB에 저장된 감정 컬럼명 → 표시 감정명 매핑
 _SCORE_TO_EMOTION = {
