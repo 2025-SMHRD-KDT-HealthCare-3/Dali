@@ -1,4 +1,7 @@
-"""위험 수준별 고정 안전 응답.
+"""
+fastapi/services/pipeline/chatbot/safety_response.py
+==================================
+위험 수준별 고정 안전 응답
 
 risk_level watch/risk/critical 에 해당하는 고정 텍스트를 반환한다.
 LLM 자유 응답 대신 이 텍스트를 우선 반환해 일관성을 보장한다.

@@ -1,5 +1,5 @@
 """
-fastapi/services/session_aggregator.py
+fastapi/model_inference/session_aggregator.py
 ========================================
 Dali — 세션(대화) 단위 감정 점수 집계
 
@@ -19,10 +19,9 @@ phase3_session_validation.ipynb 에서 도출한
 """
 
 from __future__ import annotations
-
 import numpy as np
 
-EMOTIONS = ["기쁨", "슬픔", "불안", "분노", "상처", "당황"]
+from emotions import EMOTIONS
 
 
 # ═══════════════════════════════════════════════

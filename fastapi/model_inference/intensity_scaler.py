@@ -1,6 +1,6 @@
 """
-fastapi/utils/intensity_scaler.py
-===================================
+fastapi/model_inference/intensity_scaler.py
+========================================
 VAD 강도 부사 후처리 모듈
 
 predict_emotions() 결과에 강도 부사 효과를 반영한다.
@@ -17,7 +17,7 @@ predict_emotions() 결과에 강도 부사 효과를 반영한다.
 성능: 1회 호출 평균 27.5µs (모델 추론 대비 0.02~0.05% 수준, 무시 가능)
 
 사용:
-    from utils.intensity_scaler import scale_by_intensity
+    from model_inference.intensity_scaler import scale_by_intensity
 
     raw    = predict_emotions(text)
     result = scale_by_intensity(raw, text)

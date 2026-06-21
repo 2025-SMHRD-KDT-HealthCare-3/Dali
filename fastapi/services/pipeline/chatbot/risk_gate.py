@@ -1,4 +1,7 @@
-"""위험 감지 파이프라인 (2단계).
+"""
+fastapi/services/pipeline/chatbot/risk_gate.py
+==================================
+위험 감지 파이프라인 (2단계)
 
 1단계: 키워드/패턴 매칭 (빠른 선별)
 2단계: 키워드 감지 시 LLM 문맥 판단 (비유·과장 vs 실제 위험 구분)
@@ -13,7 +16,8 @@
 import json
 import re
 
-from common.llm_client import call_llm
+from services.pipeline.common.llm_client import call_llm
+from services.pipeline.common.llm_models import RISK_MODEL
 
 _RISK_KEYWORDS: dict[str, list[str]] = {
     "suicide": [
@@ -58,7 +62,6 @@ async def detect_risk_with_context(utterance: str, history: list[dict]) -> dict:
     Returns:
         {risk_detected, risk_level, matched_category, reason}
     """
-    # 1단계: 키워드 매칭
     matched_category: str | None = None
     for category, keywords in _RISK_KEYWORDS.items():
         if any(kw in utterance for kw in keywords):
@@ -73,7 +76,6 @@ async def detect_risk_with_context(utterance: str, history: list[dict]) -> dict:
             "reason": None,
         }
 
-    # 2단계: LLM 문맥 판단
     context_lines = [
         f"{'사용자' if m.get('role') == 'user' else 'AI'}: {m.get('content', '')}"
         for m in history[-6:]
@@ -82,11 +84,14 @@ async def detect_risk_with_context(utterance: str, history: list[dict]) -> dict:
 
     prompt = _JUDGE_PROMPT.format(utterance=utterance, context=context)
     try:
-        raw = await call_llm([{"role": "user", "content": prompt}], temperature=0.0)
+        raw = await call_llm(
+            [{"role": "user", "content": prompt}],
+            temperature=0.0,
+            model=RISK_MODEL,
+        )
         cleaned = re.sub(r"```(?:json)?\s*|\s*```", "", raw).strip()
         parsed = json.loads(cleaned)
     except Exception:
-        # LLM 판단 실패 시 보수적으로 watch 처리
         parsed = {
             "risk_level": "watch",
             "matched_category": matched_category,

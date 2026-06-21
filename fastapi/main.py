@@ -1,4 +1,7 @@
-"""달리 FastAPI 서버.
+"""
+fastapi/main.py
+=================
+달리 FastAPI 서버
 
 엔드포인트:
   GET  /health                    — 헬스체크 (docker-compose healthcheck)
@@ -19,10 +22,11 @@ load_dotenv()
 from fastapi import Depends, FastAPI, File, HTTPException, Path, UploadFile
 
 from middleware.auth import require_internal_key
+from middleware.error_handler import register_error_handlers
 from schemas import ChatRequest, SessionAnalyzeRequest
 from model_inference.emotion_model import is_loaded, load_model
 from services.pipeline.chatbot.orchestrator import run_chat
-from services.pipeline.report.pipeline import analyze_session
+from services.pipeline.session.pipeline import analyze_session
 
 
 # ── 앱 생성 ────────────────────────────────────────────────────────────────────
@@ -34,6 +38,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Dali LLM API", lifespan=lifespan)
+register_error_handlers(app)
 
 
 # ── 헬스체크 ───────────────────────────────────────────────────────────────────
@@ -74,10 +79,16 @@ async def analyze_session_endpoint(
     session_id: int = Path(...),
     req: SessionAnalyzeRequest = ...,
 ):
-    """세션 종료 후 전체 대화를 분석해 요약·리뷰·미션을 반환."""
+    """세션 종료 후 전체 대화를 분석해 요약·한줄평·미션을 반환."""
     try:
         score_rows_dicts = [r.model_dump() for r in req.score_rows]
-        result = await analyze_session(req.chat_logs, score_rows_dicts, req.selected_emotion)
+        result = await analyze_session(
+            chat_logs=req.chat_logs,
+            score_rows=score_rows_dicts,
+            selected_emotion=req.selected_emotion,
+            generate_missions_flag=req.generate_missions,
+            recent_missions=req.recent_missions,
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"세션 분석 실패: {e}")
 

@@ -1,4 +1,8 @@
-"""FastAPI 공용 Pydantic 스키마."""
+"""
+fastapi/schemas.py
+====================
+FastAPI 공용 Pydantic 스키마.
+"""
 
 from pydantic import BaseModel
 
@@ -49,7 +53,9 @@ class ScoreRow(BaseModel):
 
 
 class SessionAnalyzeRequest(BaseModel):
-    user_id:          int
-    selected_emotion: str = "슬픔"
-    chat_logs:        list[dict] = []
-    score_rows:       list[ScoreRow] = []
+    user_id:           int
+    selected_emotion:  str = "슬픔"
+    chat_logs:         list[dict] = []
+    score_rows:        list[ScoreRow] = []
+    generate_missions: bool = False
+    recent_missions:   list[str] = []

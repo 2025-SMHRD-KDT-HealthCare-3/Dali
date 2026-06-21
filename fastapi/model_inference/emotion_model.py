@@ -1,5 +1,5 @@
 """
-fastapi/services/emotion_model.py
+fastapi/model_inference/emotion_model.py
 ==================================
 KcELECTRA v8 감정 추론 서비스
 
@@ -34,6 +34,7 @@ _MODEL_DIR = Path(__file__).parent.parent / "model" / "kcelectra"
 
 # 6감정 레이블. 학습 시 라벨 순서(EMOTION2ID)와 반드시 동일해야
 # 모델 출력 인덱스와 한글 라벨이 올바르게 매핑된다.
+# 의도적으로 emotions.py(공용 상수)를 import하지 않음
 EMOTIONS: list[str] = ["기쁨", "슬픔", "불안", "분노", "상처", "당황"]
 
 # 토큰 예산 — v8 학습 시 정한 고정값. 바꾸면 추론 정확도가 떨어진다.

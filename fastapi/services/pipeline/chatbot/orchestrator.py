@@ -1,4 +1,7 @@
-"""챗봇 요청 오케스트레이션.
+"""
+fastapi/services/pipeline/chatbot/orchestrator.py
+==================================
+챗봇 요청 오케스트레이션
 
 처리 순서:
   0) 감정분석 — risk/watch/none 모든 분기에서 공통으로 필요하므로 가장 먼저 계산
@@ -11,17 +14,12 @@
 from fastapi import HTTPException
 
 from schemas import ChatRequest
+from emotions import KR_TO_FIELD
 from model_inference.emotion_model import EMOTIONS, predict_emotions
+from model_inference.intensity_scaler import scale_by_intensity
 from services.pipeline.chatbot.pipeline import build_chat_reply
 from services.pipeline.chatbot.risk_gate import detect_risk_with_context
 from services.pipeline.chatbot.safety_response import get_safety_response
-from utils.intensity_scaler import scale_by_intensity
-
-
-_COLUMN_MAP = {
-    "기쁨": "joy_score",   "슬픔": "sad_score",   "불안": "anxiety_score",
-    "분노": "anger_score", "상처": "hurt_score",   "당황": "embarrass_score",
-}
 
 
 def _get_scores(utterance: str, history: list[dict]) -> dict:
@@ -32,7 +30,7 @@ def _get_scores(utterance: str, history: list[dict]) -> dict:
     )
     raw = predict_emotions(utterance, prev_text)
     scores = scale_by_intensity(raw, utterance).scores_after
-    return {_COLUMN_MAP[e]: scores[e] for e in EMOTIONS}
+    return {KR_TO_FIELD[e]: scores[e] for e in EMOTIONS}
 
 
 async def run_chat(req: ChatRequest) -> dict:

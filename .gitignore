@@ -1,45 +1,51 @@
-# 환경변수
+# ── 환경변수 / 시크릿 (절대 커밋 금지) ──
+# INTERNAL_API_KEY, OPENAI_API_KEY, DB 접속정보 등
 .env
+# .env.local 등
 .env.*
+# 예시 템플릿만 추적 허용
 !.env.example
 
-# Python
+# ── Python ──────────────────────────────
+# 파이썬 바이트코드 캐시 (자동 생성, root 소유라 sudo로만 삭제됨)
 __pycache__/
-*.pyc
-.pytest_cache/
-.venv/
-venv/
+# .pyc / .pyo / .pyd (기존 *.pyc 포함)
+*.py[cod]
+*$py.class
 
-# Node / React
+# ── 가상환경 ────────────────────────────
+venv/
+.venv/
+env/
+
+# ── Node / React ────────────────────────
 node_modules/
 dist/
 dist-ssr/
 .vite/
 
-# 모델 파일 (용량 큰 학습 결과물)
+# ── AI 모델 / 대용량 파일 ────────────────
+# 모델 파일 및 학습된 가중치 (대용량, 외부 공유)
 fastapi/model/*.pt
 fastapi/model/*.bin
+/fastapi/model/kcelectra/model.safetensors
 
-# logs
-*.log
-npm-debug.log*
-
-# OS / editor
-.DS_Store
-.vscode/
-.idea/
-
-# Claude Code
-.claude/
-
-
-# 미디어 실제 파일 제외
+# ── 미디어 파일 (폴더 구조는 유지) ──────
+# 미디어 실제 파일은 제외
 /media/music/*
 /media/video/*
-
-# 폴더 구조는 유지
+# 빈 폴더 유지를 위해 .gitkeep은 추적 허용
 !/media/music/.gitkeep
 !/media/video/.gitkeep
 
-# 학습된 모델 가중치 (대용량, 외부 공유)
-/fastapi/model/kcelectra/model.safetensors
+# ── 테스트 / 로그 ───────────────────────
+.pytest_cache/
+*.log
+npm-debug.log*
+
+# ── IDE / OS / Tools ────────────────────
+.vscode/
+.idea/
+.DS_Store
+# Claude Code
+.claude/

@@ -1,21 +1,23 @@
-"""달리 챗봇 대화 파이프라인.
+"""
+fastapi/services/pipeline/chatbot/pipeline.py
+==================================
+달리 챗봇 대화 파이프라인
 
-build_chat_reply: 페르소나 로드 → 메시지 조립 → LLM 호출 → 응답 반환
+build_chat_reply : 페르소나 로드 → 메시지 조립 → LLM 호출 → 응답 반환
 """
 
 import json
 import random
 from pathlib import Path
 
-from common.llm_client import call_llm
+from services.pipeline.common.llm_client import call_llm
+from services.pipeline.common.llm_models import CHATBOT_MODEL
 
 ASSET_DIR = Path(__file__).parent / "assets"
 DEFAULT_PERSONA = "공감형"
 
-# 지원하는 페르소나 목록
 VALID_PERSONAS = {"공감형", "동기부여형", "분석형", "친구형"}
 
-# 히스토리에서 LLM에 넘길 최대 턴 수 (user+assistant 각 N개)
 MAX_HISTORY_TURNS = 6
 
 
@@ -38,11 +40,10 @@ def _fewshot_messages(persona_data: dict, emotion: str | None) -> list[dict]:
     if not examples:
         return []
 
-    # 현재 감정 예시 우선, 부족하면 랜덤으로 채움
     matched = [e for e in examples if e.get("감정") == emotion]
     others = [e for e in examples if e.get("감정") != emotion]
     random.shuffle(others)
-    selected = (matched + others)[:2]  # 최대 2쌍
+    selected = (matched + others)[:2]
 
     messages: list[dict] = []
     for ex in selected:
@@ -76,25 +77,21 @@ async def build_chat_reply(
 
     messages: list[dict] = []
 
-    # 1) 시스템 메시지 (페르소나 기본 + 감정 분석/alert 보조 정보)
     system_content = _build_system_message(persona_data)
     system_content += _build_context_block(
         emotion, current_emotion_analysis, alert_context, recent_summaries
     )
     messages.append({"role": "system", "content": system_content})
 
-    # 2) 감정별 few-shot 예시
     messages.extend(_fewshot_messages(persona_data, emotion))
 
-    # 3) 최근 대화 히스토리 (최대 N 턴)
     if history:
         trimmed = history[-(MAX_HISTORY_TURNS * 2):]
         messages.extend(trimmed)
 
-    # 4) 현재 발화
     messages.append({"role": "user", "content": utterance})
 
-    return await call_llm(messages, temperature=0.7)
+    return await call_llm(messages, temperature=0.7, model=CHATBOT_MODEL)
 
 
 def _build_context_block(
