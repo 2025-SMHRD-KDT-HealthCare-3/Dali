@@ -1,21 +1,29 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import './mission.css'
-import daliImg      from '../../assets/public/조개탑쌓기.png'
-import shellVideo   from '../../assets/public/조개1.mp4'
+import shellVideo    from '../../assets/public/조개1.mp4'
 import pl1Dark  from '../../assets/dark/플레이리스트1.png'
 import pl2Dark  from '../../assets/dark/플레이리스트2.png'
 import pl1Light from '../../assets/light/플레이리스트1라이트.png'
 import pl2Light from '../../assets/light/플레이리스트2라이트.png'
-import musicDark  from '../../assets/dark/음악달리다크.png'
-import videoDark  from '../../assets/dark/영상달리다크.png'
-import musicLight from '../../assets/light/음악달리라이트.png'
-import videoLight from '../../assets/light/영상달리라이트.png'
+import dark1 from '../../assets/dark/조개달리다크1.mp4'
+import dark2 from '../../assets/dark/조개달리다크2.mp4'
+import dark3 from '../../assets/dark/조개달리다크3.mp4'
+import light1 from '../../assets/light/조개달리라이트1.mp4'
+import light2 from '../../assets/light/조개달리라이트2.mp4'
+import light3 from '../../assets/light/조개달리라이트3.mp4'
+
+const SHELL_VIDEOS = {
+  dark:  [dark1, dark2, dark3],
+  light: [light1, light2, light3],
+}
 import { useTheme }    from '../../contexts/ThemeContext'
 import { useAuth }     from '../../contexts/AuthContext'
 import ThemeToggle     from '../Public/ThemeToggle'
 import StarBg         from '../Public/StarBg'
 import { missionApi }  from '../../api/missions'
+import { reportApi }   from '../../api/reports'
+import Media           from './Media'
 
 const SEQ_STYLE = [
   { emoji: '🌙', color: '#9B7EFF', bg: 'rgba(155,126,255,0.18)' },
@@ -23,11 +31,6 @@ const SEQ_STYLE = [
   { emoji: '💧', color: '#7BCCE8', bg: 'rgba(123,204,232,0.18)' },
 ]
 
-const PlayIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-    <polygon points="5 3 19 12 5 21 5 3" />
-  </svg>
-)
 
 const CheckIcon = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
@@ -44,8 +47,10 @@ const Mission = () => {
   const [loading,        setLoading]        = useState(true)
   const [justAdded,      setJustAdded]      = useState(null)
   const [toastVisible,   setToastVisible]   = useState(false)
+  const [shellVideoSrc,  setShellVideoSrc]  = useState(null)
   const toastTimerRef     = useRef(null)
   const justAddedTimerRef = useRef(null)
+  const shellVideoRef     = useRef(null)
 
   useEffect(() => {
     if (!isAuthenticated) { setLoading(false); return }
@@ -74,16 +79,37 @@ const Mission = () => {
     setMissions(prev => prev.map(m => m.mission_id === mission_id ? { ...m, is_completed: 'Y' } : m))
     try {
       await missionApi.completeMission(mission_id)
+      // mission_seq(1~3) 기준으로 조개탑 영상 선택
+      const seqIdx = (mission.mission_seq ?? 1) - 1
+      const theme  = isDark ? 'dark' : 'light'
+      setShellVideoSrc(SHELL_VIDEOS[theme][seqIdx] ?? SHELL_VIDEOS[theme][0])
     } catch {
       setMissions(prev => prev.map(m => m.mission_id === mission_id ? { ...m, is_completed: 'N' } : m))
     }
   }
 
+  const [topEmotion, setTopEmotion] = useState(null)
+
+  useEffect(() => {
+    if (!isAuthenticated) return
+    reportApi.getDaily()
+      .then(res => {
+        // reports[0] = 오늘 가장 최근 세션, dominant_emotion = AI 분석 top1 감정
+        const reports = res?.reports || []
+        const counts  = {}
+        reports.forEach(r => {
+          if (r.dominant_emotion) counts[r.dominant_emotion] = (counts[r.dominant_emotion] || 0) + 1
+        })
+        const top = Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null
+        setTopEmotion(top)
+      })
+      .catch(() => {})
+  }, [isAuthenticated])
+
   const today = new Date().toISOString().slice(0, 10)
   const behaviorMissions = missions.filter(m => m.mission_date?.slice(0, 10) === today && m.mission_seq <= 3)
   const behaviorDone     = behaviorMissions.filter(m => m.is_completed === 'Y').length
   const behaviorTotal    = behaviorMissions.length
-  const plImgs           = isDark ? [musicDark, videoDark] : [musicLight, videoLight]
 
   return (
     <div className="mission-screen">
@@ -96,13 +122,13 @@ const Mission = () => {
 
         <div className="mission-header">
           <button className="mission-back" onClick={() => navigate(-1)} aria-label="뒤로가기">‹</button>
-          <h1 className="mission-hdr-title">미션</h1>
+          <h1 className="mission-hdr-title">마음 돌봄</h1>
           <div className="mission-header-end" />
         </div>
 
         <div className="behavior-title-row">
           <h2 className="behavior-title">
-            오늘의 <span className="mission-title-accent">회복 미션</span>
+            오늘의 <span className="mission-title-accent">마음돌봄</span>
             <span className="mission-title-spark"> ✦</span>
           </h2>
           {!loading && <span className="behavior-count">{behaviorDone} / {behaviorTotal} 완료</span>}
@@ -186,26 +212,28 @@ const Mission = () => {
           <img src={isDark ? pl2Dark : pl2Light} alt="" className="mission-music-banner-img" />
         </div>
 
-        <p className="mission-section-hdr">추천 플레이리스트 및 영상</p>
-
-        <div className="mission-music-list">
-          {plImgs.map((img, i) => (
-            <div key={i} className="mission-music-item">
-              <div className="mission-music-thumb">
-                <img src={img} alt="" className="mission-music-thumb-img" />
-              </div>
-              <div className="mission-item-text">
-                <span className="mission-item-title">{i === 0 ? '잔잔한 명상 음악 듣기' : '달리가 추천하는 힐링 영상'}</span>
-                <span className="mission-item-sub">{i === 0 ? '마음을 차분하게 가라앉혀요' : '오늘 하루 수고했어요'}</span>
-              </div>
-              <button className="mission-play-btn" aria-label="재생">
-                <PlayIcon />
-              </button>
-            </div>
-          ))}
-        </div>
+        <Media topEmotion={topEmotion} />
 
       </div>
+
+      {/* 조개탑 영상 오버레이 — 미션 완료 시 해당 순번 영상 재생 */}
+      {shellVideoSrc && (
+        <div className="shell-video-overlay" onClick={() => setShellVideoSrc(null)}>
+          <video
+            ref={shellVideoRef}
+            src={shellVideoSrc}
+            className="shell-video-player"
+            autoPlay
+            playsInline
+            onEnded={() => setShellVideoSrc(null)}
+          />
+          <button
+            className="shell-video-close"
+            onClick={() => setShellVideoSrc(null)}
+            aria-label="닫기"
+          >✕</button>
+        </div>
+      )}
     </div>
   )
 }

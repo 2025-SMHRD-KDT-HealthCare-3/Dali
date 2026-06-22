@@ -61,6 +61,7 @@ async def build_chat_reply(
     current_emotion_analysis: dict | None = None,
     alert_context: list[dict] | None = None,
     recent_summaries: list[str] | None = None,
+    q3_answer: str | None = None,
 ) -> str:
     """LLM에 메시지를 조립하고 응답 텍스트를 반환.
 
@@ -72,6 +73,7 @@ async def build_chat_reply(
         current_emotion_analysis: 현재 발화 감정 분석 결과 (톤 조절용 참고값)
         alert_context:            감정주의신호 맥락 (페르소나 응답 강도 조절용)
         recent_summaries:         최근 세션 요약 목록 (대화 맥락 보강용)
+        q3_answer:                온보딩 q3(신경 쓰이는 영역) — 대화 맥락 보강용
     """
     persona_data = _load_persona(persona)
 
@@ -79,7 +81,7 @@ async def build_chat_reply(
 
     system_content = _build_system_message(persona_data)
     system_content += _build_context_block(
-        emotion, current_emotion_analysis, alert_context, recent_summaries
+        emotion, current_emotion_analysis, alert_context, recent_summaries, q3_answer
     )
     messages.append({"role": "system", "content": system_content})
 
@@ -99,9 +101,17 @@ def _build_context_block(
     current_emotion_analysis: dict | None,
     alert_context: list[dict] | None,
     recent_summaries: list[str] | None,
+    q3_answer: str | None = None,
 ) -> str:
     """시스템 메시지에 추가할 동적 컨텍스트 블록."""
     parts: list[str] = []
+
+    if q3_answer:
+        parts.append(
+            f"\n\n[사용자 관심 영역 — 온보딩 답변, 대화 맥락 참고용]\n"
+            f"신경 쓰이는 영역: {q3_answer}\n"
+            "이 내용을 직접 언급하지 말고, 공감 방향을 잡는 데만 활용할 것."
+        )
 
     if emotion:
         parts.append(f"\n\n[오늘 선택 감정]\n{emotion}")

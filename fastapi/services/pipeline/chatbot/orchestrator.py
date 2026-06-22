@@ -38,7 +38,12 @@ async def run_chat(req: ChatRequest) -> dict:
 
     col_scores = _get_scores(utterance, req.history)
 
-    risk = await detect_risk_with_context(utterance, req.history)
+    risk = await detect_risk_with_context(
+        utterance,
+        req.history,
+        has_risk_keyword=req.has_risk_keyword,
+        matched_category=req.matched_category,
+    )
     risk_level = risk["risk_level"]
 
     if risk_level in ("risk", "critical"):
@@ -72,6 +77,14 @@ async def run_chat(req: ChatRequest) -> dict:
         [a.model_dump() for a in req.alert_context] if req.alert_context else None
     )
 
+    # recent_summaries: Node가 { context_summary, created_at } 객체 배열로 전달할 수 있어 str 변환
+    raw_summaries = req.recent_summaries or []
+    summaries = [
+        s if isinstance(s, str) else s.get("context_summary", "")
+        for s in raw_summaries
+        if s
+    ]
+
     try:
         reply = await build_chat_reply(
             utterance,
@@ -80,7 +93,8 @@ async def run_chat(req: ChatRequest) -> dict:
             history=req.history,
             current_emotion_analysis=emotion_analysis,
             alert_context=alert_ctx,
-            recent_summaries=req.recent_summaries,
+            recent_summaries=summaries or None,
+            q3_answer=req.q3_answer,
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"LLM 호출 실패: {e}")

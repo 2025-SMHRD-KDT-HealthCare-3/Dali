@@ -41,6 +41,11 @@ class ChatRequest(BaseModel):
     current_emotion_analysis: EmotionAnalysis | None = None
     alert_context:            list[AlertContext] | None = None
     recent_summaries:         list[str] | None = None
+    # 온보딩 q3 — Node가 DB에서 읽어 매 요청마다 전달 (FastAPI는 상태 미보유)
+    q3_answer:                str | None = None
+    # 위험 키워드 1차 감지 — Node의 riskKeywords.js 결과, FastAPI는 2차 LLM 판단만 담당
+    has_risk_keyword:         bool = False
+    matched_category:         str | None = None
 
 
 class ScoreRow(BaseModel):

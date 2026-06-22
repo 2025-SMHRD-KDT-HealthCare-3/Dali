@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect, useCallback } from 'react'
 import ThemeToggle from '../Public/ThemeToggle'
 import StarBg     from '../Public/StarBg'
 import { useTheme } from '../../contexts/ThemeContext'
+import { useAuth } from '../../contexts/AuthContext'
 import './report.css'
 import { reportApi } from '../../api/reports'
 import { emotionAlertApi } from '../../api/emotionAlerts'
@@ -68,20 +69,14 @@ const generateTrendLinePath = (data, width = 300, height = 100) => {
   }, '')
 }
 
-/* ── API 리포트 → 화면 데이터 변환 ── */
+/* ── API 리포트 → 화면 데이터 변환 ──
+   Node의 emotion_ratio = [{ emotion, score }] 사용 (score 합계 ≈ 100, 이미 정렬됨)
+   raw score 필드(joy_score 등)는 모델 미연동 시 0.0이라 직접 읽으면 빈 배열 반환 */
 const toRatios = (r) => {
-  const raw = [
-    { label: '기쁨', val: parseFloat(r.joy_score)       || 0 },
-    { label: '슬픔', val: parseFloat(r.sad_score)        || 0 },
-    { label: '불안', val: parseFloat(r.anxiety_score)    || 0 },
-    { label: '분노', val: parseFloat(r.anger_score)      || 0 },
-    { label: '상처', val: parseFloat(r.hurt_score)       || 0 },
-    { label: '당황', val: parseFloat(r.embarrass_score)  || 0 },
-  ].filter(e => e.val > 0)
-  const total = raw.reduce((s, e) => s + e.val, 0) || 1
-  return raw
-    .map(e => ({ label: e.label, pct: Math.round(e.val / total * 100) }))
-    .sort((a, b) => b.pct - a.pct)
+  const src = Array.isArray(r.emotion_ratio) ? r.emotion_ratio : []
+  return src
+    .filter(e => e.score > 0)
+    .map(e => ({ label: e.emotion, pct: Math.round(e.score) }))
 }
 
 const TODAY = new Date()
@@ -102,12 +97,14 @@ const ChevRight = () => (
 /* ════════════════════════════════════════════ */
 const Report = () => {
   const { isDark } = useTheme()
+  const { isAuthenticated } = useAuth()
 
   const [activeTab,      setActiveTab]      = useState('daily')
   const [currentDate,    setCurrentDate]    = useState(new Date())
   const [currentMonth,   setCurrentMonth]   = useState(new Date(TODAY.getFullYear(), TODAY.getMonth(), 1))
   const [dailyReports,   setDailyReports]   = useState([])
-  const [monthlyReports, setMonthlyReports] = useState([])
+  const [dailyReview,    setDailyReview]    = useState(null)   // one_line_review (최상위 키)
+  const [monthlyData,    setMonthlyData]    = useState(null)   // Node monthly 전체 응답
   const [alerts,         setAlerts]         = useState([])
   const [missions,       setMissions]       = useState([])
   const [dailyLoading,   setDailyLoading]   = useState(false)
@@ -116,19 +113,22 @@ const Report = () => {
   const loadDaily = useCallback((date) => {
     setDailyLoading(true)
     reportApi.getDaily(formatDate(date))
-      .then(res => setDailyReports(res.reports || []))
-      .catch(() => setDailyReports([]))
+      .then(res => {
+        setDailyReview(res.one_line_review || null)
+        setDailyReports(res.reports || [])
+      })
+      .catch(() => { setDailyReview(null); setDailyReports([]) })
       .finally(() => setDailyLoading(false))
   }, [])
 
   const loadMonthly = useCallback((month) => {
     setMonthlyLoading(true)
     Promise.all([
-      reportApi.getMonthly(formatMonth(month)).catch(() => ({ reports: [] })),
+      reportApi.getMonthly(formatMonth(month)).catch(() => null),
       emotionAlertApi.getAlerts().catch(() => ({ alerts: [] })),
     ])
       .then(([rRes, aRes]) => {
-        setMonthlyReports(rRes.reports || [])
+        setMonthlyData(rRes)
         setAlerts(aRes.alerts || [])
       })
       .finally(() => setMonthlyLoading(false))
@@ -139,10 +139,11 @@ const Report = () => {
 
   /* 오늘 미션 조회 (미션 수행률용) */
   useEffect(() => {
+    if (!isAuthenticated) return
     missionApi.getMissions()
       .then(res => setMissions(res.missions || []))
       .catch(() => {})
-  }, [])
+  }, [isAuthenticated])
 
   const prevDay = () => { const d = new Date(currentDate); d.setDate(d.getDate() - 1); setCurrentDate(d) }
   const nextDay = () => {
@@ -189,77 +190,63 @@ const Report = () => {
     currentMonth.getMonth() === TODAY.getMonth() &&
     day === TODAY.getDate()
 
-  /* 캘린더 날짜별 감정 맵 */
+  /* 캘린더 날짜별 감정 맵 — Node의 daily_emotions 사용 */
   const calEmotionMap = useMemo(() => {
     const map = {}
-    monthlyReports.forEach(r => {
-      const day = new Date(r.created_at).getDate()
-      if (!map[day]) map[day] = r.dominant_emotion
+    monthlyData?.daily_emotions?.forEach(({ date, selected_emotion }) => {
+      const day = new Date(date).getDate()
+      map[day] = selected_emotion
     })
     return map
-  }, [monthlyReports])
+  }, [monthlyData])
 
-  /* 월간 감정 분포 */
+  /* 월간 감정 분포 — Node의 emotion_distribution 사용 */
   const emotionSummary = useMemo(() => {
-    const counts = {}
-    monthlyReports.forEach(r => {
-      const e = r.dominant_emotion
-      if (e) counts[e] = (counts[e] || 0) + 1
-    })
-    const total = Object.values(counts).reduce((a, b) => a + b, 0) || 1
-    return Object.entries(counts)
-      .sort((a, b) => b[1] - a[1])
-      .map(([label, count]) => ({ label, pct: Math.round(count / total * 100) }))
-  }, [monthlyReports])
+    if (!monthlyData?.emotion_distribution?.length) return []
+    const total = monthlyData.emotion_distribution.reduce((s, e) => s + e.score, 0) || 1
+    return monthlyData.emotion_distribution
+      .filter(e => e.score > 0)
+      .map(e => ({ label: e.emotion, pct: Math.round(e.score / total * 100) }))
+  }, [monthlyData])
 
-  const topEmotion = emotionSummary[0]
+  const topEmotion = useMemo(() => {
+    const top = monthlyData?.summary?.top_emotion
+    if (!top) return null
+    return { label: top, pct: emotionSummary.find(e => e.label === top)?.pct || 0 }
+  }, [monthlyData, emotionSummary])
 
-  /* 활동 일수 */
-  const activeDays = useMemo(() => {
-    const days = new Set(monthlyReports.map(r => new Date(r.created_at).getDate()))
-    return days.size
-  }, [monthlyReports])
+  /* 활동 일수 — Node의 summary.active_days 사용 */
+  const activeDays = monthlyData?.summary?.active_days || 0
 
-  /* 월간 감정 변화 (날짜별 감정 점수) */
+  /* 월간 감정 변화 — Node의 emotion_trend 사용 */
   const monthlyTrendData = useMemo(() => {
+    if (!monthlyData?.emotion_trend?.length) return {}
     const daysInMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0).getDate()
     const data = Object.fromEntries(
       Object.keys(EMOTIONS).map(e => [e, Array(daysInMonth).fill(0)])
     )
-    monthlyReports.forEach(r => {
-      const day = new Date(r.created_at).getDate() - 1
-      const scores = {
-        '기쁨': parseFloat(r.joy_score)      || 0,
-        '슬픔': parseFloat(r.sad_score)       || 0,
-        '불안': parseFloat(r.anxiety_score)   || 0,
-        '분노': parseFloat(r.anger_score)     || 0,
-        '상처': parseFloat(r.hurt_score)      || 0,
-        '당황': parseFloat(r.embarrass_score) || 0,
-      }
-      Object.entries(scores).forEach(([emotion, score]) => {
-        data[emotion][day] = Math.max(data[emotion][day], score)
+    const fieldMap = { joy: '기쁨', sad: '슬픔', anxiety: '불안', anger: '분노', hurt: '상처', embarrass: '당황' }
+    monthlyData.emotion_trend.forEach(t => {
+      const day = new Date(t.date).getDate() - 1
+      Object.entries(fieldMap).forEach(([field, label]) => {
+        data[label][day] = t[field] || 0
       })
     })
     return data
-  }, [monthlyReports, currentMonth])
+  }, [monthlyData, currentMonth])
 
-  /* 주차별 세션 수 (막대 높이를 최대 세션 수 대비 비율로) */
+  /* 주차별 세션 수 — Node의 weekly_sessions 사용 */
   const weeklyTrends = useMemo(() => {
-    const buckets = { '1주': 0, '2주': 0, '3주': 0, '4주': 0 }
-    monthlyReports.forEach(r => {
-      const day = new Date(r.created_at).getDate()
-      const key = day <= 7 ? '1주' : day <= 14 ? '2주' : day <= 21 ? '3주' : '4주'
-      buckets[key]++
-    })
-    const maxCount = Math.max(...Object.values(buckets), 1)
-    return Object.entries(buckets).map(([week, count]) => ({
-      week,
+    if (!monthlyData?.weekly_sessions) return []
+    const maxCount = Math.max(...monthlyData.weekly_sessions.map(w => w.count), 1)
+    return monthlyData.weekly_sessions.map(({ week, count }) => ({
+      week: `${week}주`,
       score: Math.round(count / maxCount * 100),
       count,
     }))
-  }, [monthlyReports])
+  }, [monthlyData])
 
-  const hasTrendData = monthlyReports.length > 0
+  const hasTrendData = (monthlyData?.summary?.total_sessions || 0) > 0
 
   /* ── 렌더 ── */
   return (
@@ -273,13 +260,13 @@ const Report = () => {
 
         {/* 헤더 */}
         <div className="rp-header">
-          <h1 className="rp-title">리포트</h1>
+          <h1 className="rp-title">마음 기록</h1>
         </div>
 
         {/* 탭 */}
         <div className="rp-tabs">
-          <button className={`rp-tab${activeTab === 'daily' ? ' active' : ''}`} onClick={() => setActiveTab('daily')}>일간</button>
-          <button className={`rp-tab${activeTab === 'monthly' ? ' active' : ''}`} onClick={() => setActiveTab('monthly')}>월간</button>
+          <button className={`rp-tab${activeTab === 'daily' ? ' active' : ''}`} onClick={() => setActiveTab('daily')}>오늘의 마음 정리</button>
+          <button className={`rp-tab${activeTab === 'monthly' ? ' active' : ''}`} onClick={() => setActiveTab('monthly')}>이번 달 마음 흐름</button>
         </div>
 
         {/* ═══ 일간 ═══ */}
@@ -301,12 +288,12 @@ const Report = () => {
             ) : (
               <>
                 {/* AI 한마디 */}
-                {dailyReports[0]?.one_line_review && (
+                {dailyReview && (
                   <div className="rp-session-card rp-ai-review-card">
                     <span className="rp-ai-review-icon">💬</span>
                     <p className="rp-ai-review-text">
-                      <strong>AI 한마디</strong>
-                      {dailyReports[0].one_line_review}
+                      <strong>달리의 한마디</strong>
+                      {dailyReview}
                     </p>
                   </div>
                 )}
@@ -362,7 +349,7 @@ const Report = () => {
                             </div>
                           </div>
                           <div className="rp-math-item right">
-                            <span className="rp-math-lbl">AI 분석</span>
+                            <span className="rp-math-lbl">달리의 분석</span>
                             <div className="rp-math-val" style={{ color: me?.color || '#fff' }}>
                               {r.dominant_emotion || '❔'}
                             </div>
@@ -458,7 +445,7 @@ const Report = () => {
                 <div className="rp-sum-row">
                   <div className="rp-sum-card">
                     <span className="rp-sum-label">대화 세션</span>
-                    <span className="rp-sum-val">{monthlyReports.length}<span className="rp-sum-unit">회</span></span>
+                    <span className="rp-sum-val">{monthlyData?.summary?.total_sessions || 0}<span className="rp-sum-unit">회</span></span>
                   </div>
                   <div className="rp-sum-card">
                     <span className="rp-sum-label">최다 감정</span>
@@ -521,7 +508,7 @@ const Report = () => {
                 {/* 주차별 세션 흐름 */}
                 {hasTrendData && (
                   <div className="rp-data-card">
-                    <h3 className="rp-data-title">주차별 대화 흐름</h3>
+                    <h3 className="rp-data-title">주차별 대화 횟수</h3>
                     <div className="rp-weekly">
                       {weeklyTrends.map(({ week, score, count }) => (
                         <div key={week} className="rp-weekly-col">
@@ -536,7 +523,7 @@ const Report = () => {
                   </div>
                 )}
 
-                {monthlyReports.length === 0 && (
+                {!hasTrendData && (
                   <div className="rp-empty">
                     <span className="rp-empty-emoji">🌙</span>
                     <p>이번 달 대화 기록이 없어요</p>

@@ -52,23 +52,32 @@ JSON만 반환하세요 (다른 텍스트 없이):
 {{"risk_level": "none|watch|risk|critical", "matched_category": "suicide|self_harm|violence|farewell|unknown", "reason": "한 줄 판단 이유"}}"""
 
 
-async def detect_risk_with_context(utterance: str, history: list[dict]) -> dict:
+async def detect_risk_with_context(
+    utterance: str,
+    history: list[dict],
+    has_risk_keyword: bool = False,
+    matched_category: str | None = None,
+) -> dict:
     """2단계 위험 감지.
 
     Args:
-        utterance: 현재 사용자 발화
-        history:   최근 대화 이력 [{"role": ..., "content": ...}]
+        utterance:         현재 사용자 발화
+        history:           최근 대화 이력 [{"role": ..., "content": ...}]
+        has_risk_keyword:  Node riskKeywords.js 1차 감지 결과 — True면 키워드 스캔 생략
+        matched_category:  Node가 감지한 카테고리 (has_risk_keyword=True 시 활용)
 
     Returns:
         {risk_detected, risk_level, matched_category, reason}
     """
-    matched_category: str | None = None
-    for category, keywords in _RISK_KEYWORDS.items():
-        if any(kw in utterance for kw in keywords):
-            matched_category = category
-            break
+    if not has_risk_keyword:
+        # Node가 키워드를 감지하지 않은 경우 FastAPI 자체 키워드 목록으로 보완
+        for category, keywords in _RISK_KEYWORDS.items():
+            if any(kw in utterance for kw in keywords):
+                matched_category = category
+                has_risk_keyword = True
+                break
 
-    if not matched_category:
+    if not has_risk_keyword:
         return {
             "risk_detected": False,
             "risk_level": "none",

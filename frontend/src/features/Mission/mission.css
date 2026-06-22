@@ -29,8 +29,8 @@
 .mission-inner  { padding: 0 20px 40px; gap: 22px; }
 
 .mission-hdr-title {
-  font-size: 20px;
-  font-weight: 700;
+  font-size: var(--fs-title);
+  font-weight: var(--fw-bold);
   color: #fff;
   margin: 0;
   letter-spacing: 0.2px;
@@ -45,8 +45,8 @@
 }
 
 .mission-title {
-  font-size: 26px;
-  font-weight: 800;
+  font-size: var(--fs-hero);
+  font-weight: var(--fw-extrabold);
   color: #fff;
   margin: 0;
   letter-spacing: -0.3px;
@@ -58,12 +58,12 @@
 }
 
 .mission-title-spark {
-  font-size: 18px;
+  font-size: var(--fs-num);
   color: var(--color-moon);
 }
 
 .mission-subtitle {
-  font-size: 14px;
+  font-size: var(--fs-ui);
   color: rgba(var(--rgb-white), 0.5);
   margin: 0;
 }
@@ -101,8 +101,8 @@
 
 .mission-badge-left,
 .mission-badge-right {
-  font-size: 13px;
-  font-weight: 700;
+  font-size: var(--fs-meta);
+  font-weight: var(--fw-bold);
   padding: 5px 12px;
   border-radius: 999px;
   background: rgba(var(--rgb-white), 0.18);
@@ -126,16 +126,16 @@
 }
 
 .mission-banner-label {
-  font-size: 22px;
-  font-weight: 900;
+  font-size: var(--fs-title);
+  font-weight: var(--fw-black);
   color: #fff;
   letter-spacing: -0.3px;
   text-shadow: 0 2px 12px rgba(var(--rgb-black), 0.3);
 }
 
 .mission-banner-label2 {
-  font-size: 16px;
-  font-weight: 600;
+  font-size: var(--fs-body-lg);
+  font-weight: var(--fw-semibold);
   color: rgba(var(--rgb-white), 0.82);
 }
 
@@ -241,8 +241,8 @@
 }
 
 .mission-item-title {
-  font-size: 15px;
-  font-weight: 700;
+  font-size: var(--fs-body);
+  font-weight: var(--fw-bold);
   color: #fff;
   letter-spacing: -0.1px;
 }
@@ -254,7 +254,7 @@
 }
 
 .mission-item-sub {
-  font-size: 12px;
+  font-size: var(--fs-sub);
   color: rgba(var(--rgb-white), 0.42);
 }
 
@@ -294,8 +294,8 @@
 }
 
 .behavior-title {
-  font-size: 22px;
-  font-weight: 800;
+  font-size: var(--fs-title);
+  font-weight: var(--fw-extrabold);
   color: #fff;
   margin: 0;
   letter-spacing: -0.3px;
@@ -303,8 +303,8 @@
 }
 
 .behavior-count {
-  font-size: 13px;
-  font-weight: 700;
+  font-size: var(--fs-meta);
+  font-weight: var(--fw-bold);
   padding: 5px 14px;
   border-radius: 999px;
   background: rgba(var(--rgb-purple-glow), 0.18);
@@ -415,7 +415,7 @@
 
 /* 조개 0개일 때 힌트 */
 .shell-empty-hint {
-  font-size: 11px;
+  font-size: var(--fs-caption);
   color: rgba(var(--rgb-white), 0.28);
   text-align: center;
   line-height: 1.7;
@@ -435,6 +435,44 @@
   align-self: flex-end;
 }
 
+/* ── 조개탑 영상 오버레이 ── */
+.shell-video-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.88);
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.shell-video-player {
+  width: 100%;
+  max-width: 420px;
+  max-height: 80vh;
+  border-radius: 20px;
+  display: block;
+  object-fit: contain;
+}
+
+.shell-video-close {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.15);
+  border: none;
+  color: #fff;
+  font-size: 18px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(8px);
+}
+
 /* 토스트 메시지 */
 .shell-toast {
   align-self: center;
@@ -444,8 +482,8 @@
   border: 1px solid rgba(var(--rgb-purple-lavender), 0.35);
   border-radius: 999px;
   color: #fff;
-  font-size: 13px;
-  font-weight: 600;
+  font-size: var(--fs-meta);
+  font-weight: var(--fw-semibold);
   letter-spacing: 0.1px;
   text-align: center;
   animation: toast-appear 2.5s ease forwards;
@@ -490,16 +528,16 @@
 }
 
 .mission-music-banner-title {
-  font-size: 24px;
-  font-weight: 900;
+  font-size: var(--fs-hero);
+  font-weight: var(--fw-black);
   color: #fff;
   letter-spacing: -0.3px;
   text-shadow: 0 2px 12px rgba(var(--rgb-black), 0.4);
 }
 
 .mission-music-banner-sub {
-  font-size: 17px;
-  font-weight: 700;
+  font-size: var(--fs-section);
+  font-weight: var(--fw-bold);
   color: rgba(var(--rgb-white), 0.85);
 }
 
@@ -508,8 +546,8 @@
   top: 14px;
   right: 14px;
   z-index: 2;
-  font-size: 13px;
-  font-weight: 700;
+  font-size: var(--fs-meta);
+  font-weight: var(--fw-bold);
   padding: 5px 12px;
   border-radius: 999px;
   background: rgba(var(--rgb-white), 0.18);
@@ -518,8 +556,8 @@
 }
 
 .mission-section-hdr {
-  font-size: 16px;
-  font-weight: 700;
+  font-size: var(--fs-section);
+  font-weight: var(--fw-bold);
   color: #fff;
   margin: 0;
   padding-left: 2px;

@@ -28,6 +28,7 @@ transformers==4.40.0
 #   반드시 학습 환경과 동일한 버전 사용
 
 torch            # PyTorch - 모델 추론 실행
+safetensors      # model.safetensors 로드용 — 없으면 transformers가 pytorch_model.bin을 찾다가 OSError 발생
 
 sentencepiece    # KcELECTRA 토크나이저 내부적으로 사용
                  # 없으면 토크나이저 로드 시 에러 발생
