@@ -37,6 +37,32 @@ const RISK_KEYWORDS = require('../assets/riskKeywords');
 const upload = multer({ storage: multer.memoryStorage() });
 
 
+/*
+ * buildEmotionAnalysis - 직전 발화의 감정분석을 FastAPI current_emotion_analysis 형식으로 변환
+ * - chat_analyses 최근 1건(가장 최근 user 발화의 점수)을 LLM 프롬프트 참고용으로 전달
+ * - messages는 turn_idx ASC 정렬 → 뒤에서부터 점수가 있는 user 발화를 찾음
+ * - 분석 이력이 없으면(첫 발화 등) null 반환 (명세상 허용)
+ * - 점수 컬럼은 DECIMAL(4,1)이라 mysql2가 문자열로 반환 → Number로 변환 후 전송
+ */
+function buildEmotionAnalysis(messages) {
+  const last = [...messages].reverse().find(m => m.role === 'user' && m.joy_score !== null);
+  if (!last) return null;
+
+  const emotion_scores = {
+    기쁨: Number(last.joy_score),
+    슬픔: Number(last.sad_score),
+    불안: Number(last.anxiety_score),
+    분노: Number(last.anger_score),
+    상처: Number(last.hurt_score),
+    당황: Number(last.embarrass_score),
+  };
+  const dominant_emotion = Object.keys(emotion_scores).reduce((a, b) =>
+    emotion_scores[a] >= emotion_scores[b] ? a : b
+  );
+  return { dominant_emotion, emotion_scores };
+}
+
+
 // 위기 이벤트 저장 + 3회 시 세션 종료 — 응답은 호출부에서 처리
 async function saveRiskEvent({ user_id, session_id, matched_category }) {
   const prevCount = await riskEventRepo.countBySessionId(session_id, user_id);
@@ -140,19 +166,21 @@ async function chatRespond(req, res) {
         utterance,
         has_risk_keyword:     hasRiskKeyword,
         confirmed_count,
-        persona:              user?.persona || null,
+        // persona는 FastAPI 스키마상 str(필수, null 불가) → 미설정 시 명세 기본값 '공감형' 전달
+        persona:              user?.persona || '공감형',
         selected_emotion:     session?.selected_emotion || null,
         // history: role/content 형식으로 변환해서 전달
         history:              messages.map(m => ({ role: m.role, content: m.content })),
-        // current_emotion_analysis: 감정 모델 연동 전까지 null
-        current_emotion_analysis: null,
+        // current_emotion_analysis: 직전 발화의 감정분석(chat_analyses 최근 1건) — LLM 프롬프트 참고용
+        current_emotion_analysis: buildEmotionAnalysis(messages),
         alert_context:        alerts.slice(0, 2).map(a => ({
           alert_detected: true,
           alert_emotion:  a.alerted_emotion,
           alert_reason:   a.alert_reason,
           alert_message:  `최근 며칠 동안 ${a.alerted_emotion} 감정이 자주 나타나고 있어요.`,
         })),
-        recent_summaries:     summaries,
+        // FastAPI는 recent_summaries를 문자열 배열로 받음 → context_summary만 추출
+        recent_summaries:     summaries.map(s => s.context_summary),
       },
       { headers: { 'X-Internal-API-Key': process.env.INTERNAL_API_KEY } }
     );
@@ -285,17 +313,19 @@ async function chatAudio(req, res) {
         utterance,
         has_risk_keyword:     hasRiskKeyword,
         confirmed_count,
-        persona:              user?.persona || null,
+        // persona는 FastAPI 스키마상 str(필수, null 불가) → 미설정 시 명세 기본값 '공감형' 전달
+        persona:              user?.persona || '공감형',
         selected_emotion:     session?.selected_emotion || null,
         history:              messages.map(m => ({ role: m.role, content: m.content })),
-        current_emotion_analysis: null,
+        current_emotion_analysis: buildEmotionAnalysis(messages),
         alert_context:        alerts.slice(0, 2).map(a => ({
           alert_detected: true,
           alert_emotion:  a.alerted_emotion,
           alert_reason:   a.alert_reason,
           alert_message:  `최근 며칠 동안 ${a.alerted_emotion} 감정이 자주 나타나고 있어요.`,
         })),
-        recent_summaries:     summaries,
+        // FastAPI는 recent_summaries를 문자열 배열로 받음 → context_summary만 추출
+        recent_summaries:     summaries.map(s => s.context_summary),
       },
       { headers: { 'X-Internal-API-Key': process.env.INTERNAL_API_KEY } }
     );
