@@ -31,24 +31,40 @@ async def call_llm(
     messages: list[dict],
     *,
     model: str,
-    temperature: float = 0.7,
+    temperature: float | None = None,
 ) -> str:
     """OpenAI Chat Completions 를 호출하고 assistant 응답 텍스트를 반환.
 
     Args:
-        messages: OpenAI 형식 메시지 리스트 [{"role": ..., "content": ...}, ...]
-        model: 사용할 OpenAI 모델 ID. 기본값 없음 — 호출부에서 반드시 명시적으로
-            전달해야 함 (빠뜨리면 TypeError로 즉시 드러남).
-            파이프라인별 실제 값은 services/pipeline/common/llm_models.py 참고.
-            (모델명은 자주 바뀌므로 연동 시 현재 ID 확인 필요.)
-        temperature: 생성 다양성 (0 ~ 2). 파이프라인마다 값이 달라서 호출부에서 직접 지정.
+        messages: OpenAI 형식 메시지 리스트
+        [{"role": ..., "content": ...}, ...]
+
+    model:
+        사용할 OpenAI 모델 ID.
+        파이프라인별 실제 값은
+        services/pipeline/common/llm_models.py 참고.
+
+    temperature:
+        생성 다양성 제어 값.
+        GPT-4.x 계열에서는 적용되며,
+        GPT-5 계열은 OpenAI 제약으로 인해
+        temperature 파라미터를 지원하지 않아 자동 무시된다.
 
     Returns:
         LLM이 생성한 텍스트. content 가 비어 있으면 빈 문자열.
     """
+    
+    kwargs = {
+        "model": model,
+        "messages": messages,
+    }
+
+    # GPT-5 계열은 temperature 미지원
+    if not model.startswith("gpt-5"):
+        kwargs["temperature"] = temperature
+
     response = await _get_client().chat.completions.create(
-        model=model,
-        messages=messages,
-        temperature=temperature,
+        **kwargs
     )
+
     return response.choices[0].message.content or ""
