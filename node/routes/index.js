@@ -59,6 +59,9 @@
  * [감정 주의 신호]
  * - GET    /api/emotion-alerts                    감정 주의 신호 목록
  * - PATCH  /api/emotion-alerts/:id/confirm        감정 주의 신호 확인 처리
+ *
+ * [고위험 신호]
+ * - GET    /api/risk-events(?session_id=X)        고위험 신호 목록 (세션별 필터 가능)
  */
 
 const express = require('express');
@@ -87,6 +90,7 @@ const onboardingCtrl = require('../controllers/onboardingController');
 const logAnalysisCtrl = require('../controllers/logAnalysisController');
 const summaryCtrl = require('../controllers/summaryController');
 const emotionAlertCtrl = require('../controllers/emotionAlertController');
+const riskEventCtrl = require('../controllers/riskEventController');
 
 // 인증
 router.get('/auth/check-email', authCtrl.checkEmail);
@@ -150,6 +154,9 @@ router.get('/media/video', requireLogin, mediaCtrl.getVideoMedia);
 // 감정 주의 신호
 router.get('/emotion-alerts', requireLogin, emotionAlertCtrl.getEmotionAlerts);
 router.patch('/emotion-alerts/:id/confirm', requireLogin, emotionAlertCtrl.confirmAlert);
+
+// 고위험 신호 (조회) — session_id 쿼리로 세션별 필터 가능
+router.get('/risk-events', requireLogin, riskEventCtrl.getRiskEvents);
 
 
 module.exports = router;

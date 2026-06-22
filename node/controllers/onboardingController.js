@@ -7,7 +7,6 @@
  * 페르소나 계산: q1(+2), q2(+1), q4(+3) 가중치 합산 / 동점 시 q4 우선
  */
 
-const axios = require('axios');
 const onboardingRepo = require('../repositories/onboardingRepository');
 
 // 질문 텍스트 + 보기 — 설정 페이지에서 이전 온보딩 답변 재표시용
@@ -95,17 +94,7 @@ async function saveOnboarding(req, res) {
     rows.map(r => onboardingRepo.upsertOnboarding({ user_id: req.user.user_id, ...r }))
   );
 
-  // q3(신경쓰이는 영역)을 FastAPI에 전달 — LLM 대화 컨텍스트로 활용
-  try {
-    await axios.post(
-      `${process.env.FASTAPI_URL}/onboarding/context`,
-      { user_id: req.user.user_id, q3_answer: q3 },
-      { headers: { 'X-Internal-API-Key': process.env.INTERNAL_API_KEY } }
-    );
-  } catch {
-    return res.status(502).json({ code: 'BAD_GATEWAY', message: '컨텍스트 전달에 실패했습니다. 다시 시도해주세요.' });
-  }
-
+  // q3(신경쓰이는 영역)는 별도 호출 없이, 채팅 시 chatController가 DB에서 읽어 FastAPI에 전달함
   const recommended_persona = calculatePersona(q1, q2, q4);
   res.status(201).json({ recommended_persona });
 }
