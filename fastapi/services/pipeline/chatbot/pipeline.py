@@ -62,6 +62,7 @@ async def build_chat_reply(
     alert_context: list[dict] | None = None,
     recent_summaries: list[str] | None = None,
     q3_answer: str | None = None,
+    cautious_mode: bool = False,
 ) -> str:
     """LLM에 메시지를 조립하고 응답 텍스트를 반환.
 
@@ -74,6 +75,7 @@ async def build_chat_reply(
         alert_context:            감정주의신호 맥락 (페르소나 응답 강도 조절용)
         recent_summaries:         최근 세션 요약 목록 (대화 맥락 보강용)
         q3_answer:                온보딩 q3(신경 쓰이는 영역) — 대화 맥락 보강용
+        cautious_mode:            True 시 신중 모드 지침 주입 (risk 1~2회 감지 시)
     """
     persona_data = _load_persona(persona)
 
@@ -81,7 +83,8 @@ async def build_chat_reply(
 
     system_content = _build_system_message(persona_data)
     system_content += _build_context_block(
-        emotion, current_emotion_analysis, alert_context, recent_summaries, q3_answer
+        emotion, current_emotion_analysis, alert_context, recent_summaries, q3_answer,
+        cautious_mode=cautious_mode,
     )
     messages.append({"role": "system", "content": system_content})
 
@@ -102,9 +105,16 @@ def _build_context_block(
     alert_context: list[dict] | None,
     recent_summaries: list[str] | None,
     q3_answer: str | None = None,
+    cautious_mode: bool = False,
 ) -> str:
     """시스템 메시지에 추가할 동적 컨텍스트 블록."""
+    from services.pipeline.chatbot.safety_response import CAUTIOUS_MODE_PROMPT
+
     parts: list[str] = []
+
+    # 신중 모드 지침을 가장 먼저 주입해 LLM이 최우선으로 읽도록 함
+    if cautious_mode:
+        parts.append(CAUTIOUS_MODE_PROMPT)
 
     if q3_answer:
         parts.append(

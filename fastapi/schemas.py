@@ -46,6 +46,9 @@ class ChatRequest(BaseModel):
     # 위험 키워드 1차 감지 — Node의 riskKeywords.js 결과, FastAPI는 2차 LLM 판단만 담당
     has_risk_keyword:         bool = False
     matched_category:         str | None = None
+    # 위험 감지 서비스 상태 — Node가 risk_events 조회 후 전달
+    prior_risk_count:         int  = 0     # 세션 내 risk 레벨 이벤트 수 (이번 요청 이전)
+    is_in_safety_mode:        bool = False  # risk 3회↑ 또는 critical 1회↑ 이면 True
 
 
 class ScoreRow(BaseModel):
