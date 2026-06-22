@@ -112,6 +112,10 @@ const Chat = () => {
   const [isUserTyping, setIsUserTyping] = useState(false)
   const debounceRef                      = useRef(null)
 
+  /* ── 응답 대기 중 메시지 큐 ── */
+  const pendingQueueRef = useRef([])
+  const isTypingRef     = useRef(false)
+
   /* ── 음성 녹음 ── */
   const [isRecording, setIsRecording]   = useState(false)
   const mediaRecorderRef                 = useRef(null)
@@ -215,16 +219,14 @@ const Chat = () => {
   }, [messages, isTyping])
 
   /* ── 채팅 메시지 전송 ── */
-  const sendMessage = async (text) => {
-    if (!text.trim() || isRisk) return
-    const trimmed = text.trim()
-    if (!hasSentFirst) setHasSentFirst(true)
-    addUser(trimmed)
-    setInput('')
+  // 실제 API 호출 — messages 배열을 하나로 묶어서 전송, 완료 후 큐 소진
+  const sendBatch = async (messages) => {
+    isTypingRef.current = true
     setIsTyping(true)
 
+    const utterance = messages.join('\n')
     try {
-      const body = { utterance: trimmed }
+      const body = { utterance }
       if (isAuthenticated && sessionIdRef.current) body.session_id = sessionIdRef.current
 
       const res = await chatApi.sendMessage(body)
@@ -233,6 +235,7 @@ const Chat = () => {
         setIsRisk(true)
         setSessionId(null)
         sessionIdRef.current = null
+        pendingQueueRef.current = []
         addDali('지금 많이 힘드신 것 같아요. 혼자 버티지 않아도 돼요.\n\n📞 자살예방상담전화: 1393\n📞 정신건강위기상담전화: 1577-0199\n\n언제든 다시 찾아와 주세요 🌙')
       } else {
         addDali(res.reply || '...')
@@ -240,8 +243,32 @@ const Chat = () => {
     } catch {
       addDali('죄송해요, 잠시 연결이 끊겼어요. 다시 시도해주세요.')
     } finally {
+      isTypingRef.current = false
       setIsTyping(false)
+
+      // 대기 중에 쌓인 메시지가 있으면 한 번에 묶어 재전송
+      if (pendingQueueRef.current.length > 0) {
+        const queued = [...pendingQueueRef.current]
+        pendingQueueRef.current = []
+        sendBatch(queued)
+      }
     }
+  }
+
+  const sendMessage = (text) => {
+    if (!text.trim() || isRisk) return
+    const trimmed = text.trim()
+    if (!hasSentFirst) setHasSentFirst(true)
+    addUser(trimmed)
+    setInput('')
+
+    // 달리가 응답 생성 중이면 큐에 쌓고 끝
+    if (isTypingRef.current) {
+      pendingQueueRef.current.push(trimmed)
+      return
+    }
+
+    sendBatch([trimmed])
   }
 
   const handleSend = () => {
@@ -272,6 +299,9 @@ const Chat = () => {
 
     const placeholderId = Date.now() + Math.random()
     setMessages(prev => [...prev, { id: placeholderId, role: 'user', text: '🎤 음성 인식 중...', time: now(), read: false }])
+
+    // 달리가 응답 중이면 음성도 큐에 넣지 않고 독립 전송 (STT 결과가 필요하므로)
+    isTypingRef.current = true
     setIsTyping(true)
     try {
       const formData = new FormData()
@@ -281,7 +311,6 @@ const Chat = () => {
       }
       const res = await chatApi.sendAudio(formData)
 
-      // Node가 utterance를 반환하면 실제 전사 텍스트로 교체, 없으면 🎤 음성 메시지로 fallback
       const displayText = res.utterance || '🎤 음성 메시지'
       setMessages(prev => prev.map(m => m.id === placeholderId ? { ...m, text: displayText } : m))
 
@@ -289,6 +318,7 @@ const Chat = () => {
         setIsRisk(true)
         setSessionId(null)
         sessionIdRef.current = null
+        pendingQueueRef.current = []
         addDali('지금 많이 힘드신 것 같아요. 혼자 버티지 않아도 돼요.\n\n📞 자살예방상담전화: 1393\n📞 정신건강위기상담전화: 1577-0199\n\n언제든 다시 찾아와 주세요 🌙')
       } else {
         addDali(res.reply || '...')
@@ -297,7 +327,14 @@ const Chat = () => {
       setMessages(prev => prev.map(m => m.id === placeholderId ? { ...m, text: '🎤 음성 메시지' } : m))
       addDali('죄송해요, 음성 전송에 실패했어요. 다시 시도해주세요.')
     } finally {
+      isTypingRef.current = false
       setIsTyping(false)
+
+      if (pendingQueueRef.current.length > 0) {
+        const queued = [...pendingQueueRef.current]
+        pendingQueueRef.current = []
+        sendBatch(queued)
+      }
     }
   }
 
