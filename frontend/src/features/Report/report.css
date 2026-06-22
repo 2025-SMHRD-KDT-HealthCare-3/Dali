@@ -43,8 +43,8 @@
 }
 
 .rp-title {
-  font-size: 22px;
-  font-weight: 800;
+  font-size: var(--fs-title);
+  font-weight: var(--fw-extrabold);
   color: #fff;
   margin: 0;
   letter-spacing: -0.2px;
@@ -68,8 +68,8 @@
   border: none;
   background: transparent;
   color: rgba(var(--rgb-white), 0.5);
-  font-size: 14px;
-  font-weight: 600;
+  font-size: var(--fs-ui);
+  font-weight: var(--fw-semibold);
   font-family: inherit;
   cursor: pointer;
   transition: background 0.22s, color 0.22s;
@@ -112,8 +112,8 @@
 .rp-nav-btn:disabled { opacity: 0.28; cursor: not-allowed; }
 
 .rp-date-label {
-  font-size: 15px;
-  font-weight: 700;
+  font-size: var(--fs-body);
+  font-weight: var(--fw-bold);
   color: #fff;
 }
 
@@ -126,7 +126,7 @@
   gap: 12px;
   padding: 52px 20px;
   color: rgba(var(--rgb-white), 0.38);
-  font-size: 14px;
+  font-size: var(--fs-ui);
 }
 .rp-empty-emoji { font-size: 44px; }
 
@@ -158,7 +158,7 @@
 }
 
 .rp-ai-review-text {
-  font-size: 13px;
+  font-size: var(--fs-meta);
   color: rgba(var(--rgb-white), 0.85);
   line-height: 1.5;
   margin: 0;
@@ -167,7 +167,7 @@
 
 .rp-ai-review-text strong {
   display: block;
-  font-size: 11px;
+  font-size: var(--fs-caption);
   color: var(--color-primary-soft);
   margin-bottom: 4px;
 }
@@ -181,19 +181,19 @@
 }
 
 .rp-session-num {
-  font-size: 13px;
-  font-weight: 700;
+  font-size: var(--fs-meta);
+  font-weight: var(--fw-bold);
   color: var(--color-primary-soft);
 }
 
 .rp-session-time {
-  font-size: 13px;
+  font-size: var(--fs-meta);
   color: rgba(var(--rgb-white), 0.5);
   flex: 1;
 }
 
 .rp-session-dur {
-  font-size: 12px;
+  font-size: var(--fs-sub);
   padding: 3px 10px;
   border-radius: 999px;
   background: rgba(var(--rgb-purple-lavender), 0.12);
@@ -230,15 +230,15 @@
 }
 
 .rp-math-lbl {
-  font-size: 11px;
+  font-size: var(--fs-caption);
   color: rgba(var(--rgb-white), 0.48);
-  font-weight: 500;
+  font-weight: var(--fw-medium);
   margin-bottom: 2px;
 }
 
 .rp-math-val {
-  font-size: 15px;
-  font-weight: 700;
+  font-size: var(--fs-body);
+  font-weight: var(--fw-bold);
 }
 
 .rp-math-graph {
@@ -265,8 +265,8 @@
 }
 
 .rp-bar-label {
-  font-size: 12px;
-  font-weight: 600;
+  font-size: var(--fs-sub);
+  font-weight: var(--fw-semibold);
   color: rgba(var(--rgb-white), 0.48);
 }
 
@@ -291,12 +291,12 @@
 }
 
 .rp-mission-pct {
-  font-size: 13px;
-  font-weight: 700;
+  font-size: var(--fs-meta);
+  font-weight: var(--fw-bold);
 }
 
 .rp-mission-desc {
-  font-size: 11px;
+  font-size: var(--fs-caption);
   color: rgba(var(--rgb-white), 0.38);
   margin: 4px 0 0;
 }
@@ -313,7 +313,7 @@
   display: flex;
   align-items: center;
   gap: 5px;
-  font-size: 12px;
+  font-size: var(--fs-sub);
   color: rgba(var(--rgb-white), 0.58);
 }
 
@@ -345,8 +345,8 @@
 
 .rp-cal-hlabel {
   text-align: center;
-  font-size: 12px;
-  font-weight: 600;
+  font-size: var(--fs-sub);
+  font-weight: var(--fw-semibold);
   color: rgba(var(--rgb-white), 0.35);
   padding: 4px 0;
 }
@@ -388,8 +388,8 @@
 
 /* 날짜 숫자 */
 .rp-cal-num {
-  font-size: 13px;
-  font-weight: 500;
+  font-size: var(--fs-meta);
+  font-weight: var(--fw-medium);
   color: rgba(var(--rgb-white), 0.42);
   line-height: 1;
 }
@@ -397,7 +397,7 @@
 
 .rp-cal-cell.is-today .rp-cal-num {
   color: var(--color-primary-soft);
-  font-weight: 800;
+  font-weight: var(--fw-extrabold);
 }
 
 /* 범례 */
@@ -432,22 +432,22 @@
 }
 
 .rp-sum-label {
-  font-size: 11px;
+  font-size: var(--fs-caption);
   color: rgba(var(--rgb-white), 0.44);
-  font-weight: 500;
+  font-weight: var(--fw-medium);
   line-height: 1.3;
 }
 
 .rp-sum-val {
-  font-size: 18px;
-  font-weight: 800;
+  font-size: var(--fs-num);
+  font-weight: var(--fw-extrabold);
   color: #fff;
   line-height: 1;
 }
 
 .rp-sum-unit {
-  font-size: 13px;
-  font-weight: 600;
+  font-size: var(--fs-meta);
+  font-weight: var(--fw-semibold);
 }
 
 /* ═══════════════════════════════════════════
@@ -466,8 +466,8 @@
 }
 
 .rp-data-title {
-  font-size: 15px;
-  font-weight: 700;
+  font-size: var(--fs-section);
+  font-weight: var(--fw-bold);
   color: #fff;
   margin: 0;
 }
@@ -502,8 +502,8 @@
 }
 
 .rp-weekly-score {
-  font-size: 12px;
-  font-weight: 700;
+  font-size: var(--fs-sub);
+  font-weight: var(--fw-bold);
   color: var(--color-primary-soft);
 }
 
@@ -526,9 +526,9 @@
 }
 
 .rp-weekly-label {
-  font-size: 12px;
+  font-size: var(--fs-sub);
   color: rgba(var(--rgb-white), 0.42);
-  font-weight: 500;
+  font-weight: var(--fw-medium);
 }
 
 /* ═══════════════════════════════════════════
@@ -554,8 +554,8 @@
 
 /* 건수 배지 */
 .rp-alert-count {
-  font-size: 12px;
-  font-weight: 700;
+  font-size: var(--fs-sub);
+  font-weight: var(--fw-bold);
   padding: 3px 10px;
   border-radius: 999px;
   background: rgba(var(--rgb-error), 0.18);
@@ -564,7 +564,7 @@
 }
 
 .rp-alert-desc {
-  font-size: 12px;
+  font-size: var(--fs-sub);
   color: rgba(var(--rgb-white), 0.38);
   margin: -4px 0 0;
 }
@@ -621,24 +621,24 @@
 }
 
 .rp-alert-emotion {
-  font-size: 13px;
-  font-weight: 700;
+  font-size: var(--fs-meta);
+  font-weight: var(--fw-bold);
 }
 
 .rp-alert-reason {
-  font-size: 12px;
+  font-size: var(--fs-sub);
   color: rgba(var(--rgb-white), 0.5);
 }
 
 .rp-alert-date {
-  font-size: 11px;
+  font-size: var(--fs-caption);
   color: rgba(var(--rgb-white), 0.32);
 }
 
 /* 확인 배지 */
 .rp-alert-badge {
-  font-size: 11px;
-  font-weight: 700;
+  font-size: var(--fs-caption);
+  font-weight: var(--fw-bold);
   padding: 4px 10px;
   border-radius: 999px;
   white-space: nowrap;
@@ -660,7 +660,7 @@
   justify-content: center;
   gap: 8px;
   padding: 20px 0 8px;
-  font-size: 13px;
+  font-size: var(--fs-meta);
   color: rgba(var(--rgb-white), 0.35);
 }
 

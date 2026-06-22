@@ -29,9 +29,9 @@ const SettingsIcon = ({ active }) => (
 )
 
 const TABS = [
-  { id: 'report',   label: '리포트', path: '/report',   Icon: ReportIcon  },
-  { id: 'chat',     label: '챗봇',   path: '/main',     Icon: ChatIcon    },
-  { id: 'mission',  label: '미션',   path: '/mission',  Icon: MissionIcon },
+  { id: 'report',   label: '마음기록', path: '/report',   Icon: ReportIcon  },
+  { id: 'chat',     label: '달리',   path: '/main',     Icon: ChatIcon    },
+  { id: 'mission',  label: '마음돌봄',   path: '/mission',  Icon: MissionIcon },
   { id: 'settings', label: '설정',   path: '/settings', Icon: SettingsIcon },
 ]
 
