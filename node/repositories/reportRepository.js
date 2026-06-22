@@ -31,7 +31,7 @@ async function findDailyReports(user_id, date) {
 
 // 월간 집계용 — 세션 단위 raw 데이터 (created_at ASC → 날짜별 마지막 세션이 덮어씀)
 async function findMonthlyRaw(user_id, month) {
-  const yearMonth = month || new Date().toISOString().slice(0, 7);
+  // month 미지정 시 이번 달 — JS-UTC 대신 DB의 KST 기준(CURDATE)으로 산정
   const [rows] = await pool.query(
     `SELECT DATE(r.created_at)  AS date,
             DAY(r.created_at)   AS day_of_month,
@@ -42,9 +42,9 @@ async function findMonthlyRaw(user_id, month) {
      FROM reports r
      JOIN session_analyses sa ON r.session_analysis_id = sa.session_analysis_id
      JOIN sessions s          ON r.session_id = s.session_id
-     WHERE r.user_id = ? AND DATE_FORMAT(r.created_at, '%Y-%m') = ?
+     WHERE r.user_id = ? AND DATE_FORMAT(r.created_at, '%Y-%m') = COALESCE(?, DATE_FORMAT(CURDATE(), '%Y-%m'))
      ORDER BY r.created_at ASC`,
-    [user_id, yearMonth]
+    [user_id, month || null]
   );
   return rows;
 }

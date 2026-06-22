@@ -57,7 +57,7 @@ async function startSession(req, res) {
     session_id:          sessionId,
     greeting_type,
     today_session_count: totalCount - 1,  // 방금 만든 세션 제외한 오늘 세션 수
-    last_session_date:   lastDate ? lastDate.toISOString().split('T')[0] : null,
+    last_session_date:   lastDate ? lastDate.toLocaleDateString('en-CA', { timeZone: 'Asia/Seoul' }) : null,
     has_emotion_alert:   !!latestAlert,
     alert_context: latestAlert ? {
       alert_id:      latestAlert.e_alert_id,
@@ -87,9 +87,9 @@ async function endSession(req, res) {
   // FastAPI 페이로드 구성 — 대화 내역과 감정 점수를 직접 조회해서 전달
   // FastAPI가 DB를 직접 조회하지 않고 Node에서 넘겨주는 방식
   const messages = await sessionRepo.findMessagesBySession(id);
-  // chat_logs: role/content 형식으로 변환
-  const chat_logs = messages.map(m => ({ role: m.role, content: m.content }));
-  // score_rows: 사용자 발화 중 감정 점수가 있는 것만 추출
+  // chat_logs: FastAPI는 speaker/utterance 키로 읽음 (role/content 아님)
+  const chat_logs = messages.map(m => ({ speaker: m.role, utterance: m.content }));
+  // score_rows: 사용자 발화 중 감정 점수가 있는 것만 추출 (turn_idx 순서 유지 — 가중 집계 전제)
   const score_rows = messages
     .filter(m => m.role === 'user' && m.joy_score !== null)
     .map(m => ({
@@ -97,17 +97,27 @@ async function endSession(req, res) {
       anger_score: m.anger_score, hurt_score: m.hurt_score, embarrass_score: m.embarrass_score,
     }));
 
+  // 미션은 하루 첫 세션에만 생성 → generate_missions 플래그로 FastAPI에 전달
+  // 생성할 때만 최근 미션 이력 조회 (중복 회피용 recent_missions)
+  const missionsExist = await missionRepo.hasMissionsToday(req.user.user_id);
+  const generate_missions = !missionsExist;
+  const recent_missions = generate_missions
+    ? await missionRepo.findRecentContents(req.user.user_id, 5)
+    : [];
+
   // FastAPI에 세션 분석 요청
-  // 반환값: 감정 점수들, 주요 감정, 대화 요약, 한줄 리뷰, 미션 3개
+  // 반환값: 감정 점수들, 주요 감정, 대화 요약, 한줄 리뷰, 미션 3개(generate_missions=false면 null)
   let data;
   try {
     ({ data } = await axios.post(
       `${process.env.FASTAPI_URL}/sessions/${id}/analyze`,
       {
-        user_id:          req.user.user_id,
-        selected_emotion: session.selected_emotion,
+        user_id:           req.user.user_id,
+        selected_emotion:  session.selected_emotion,
         chat_logs,
         score_rows,
+        generate_missions,
+        recent_missions,
       },
       { headers: { 'X-Internal-API-Key': process.env.INTERNAL_API_KEY } }
     ));
@@ -126,18 +136,20 @@ async function endSession(req, res) {
     joy_score, sad_score, anxiety_score, anger_score, hurt_score, embarrass_score, dominant_emotion,
   });
 
-  // 미션은 하루 첫 세션에만 생성, 리포트/요약은 세션마다 생성
-  const missionsExist = await missionRepo.hasMissionsToday(req.user.user_id);
-
+  // 리포트/요약은 세션마다 생성
   const saveJobs = [
     reportRepo.createReport({ user_id: req.user.user_id, session_id: id, session_analysis_id: sessionAnalysisId, one_line_review }),
     summaryRepo.createSummary({ user_id: req.user.user_id, session_id: id, context_summary }),
   ];
-  if (!missionsExist) saveJobs.push(missionRepo.createMissions(req.user.user_id, id, missions.map((m, i) => ({
-    mission_seq: i + 1,
-    mission_content: m.title,
-  }))));
+  // 미션은 하루 첫 세션에만 — FastAPI가 {mission_seq, mission_content} 형식으로 반환(아니면 null)
+  if (generate_missions && missions) {
+    saveJobs.push(missionRepo.createMissions(req.user.user_id, id, missions));
+  }
   await Promise.all(saveJobs);
+
+  // 세션 종료 후 그날 미션을 프론트에 반환 (신규 생성/기존 무관)
+  // 명세 Node 로직: 2번째 이후 세션도 그날 미션을 DB에서 읽어 반환
+  const todayMissions = await missionRepo.findTodayMissions(req.user.user_id);
 
   // 주요 감정이 ALERT 목록에 있고 5일 연속이면 감정 주의 신호 자동 생성
   if (dominant_emotion && ALERT_EMOTIONS.includes(dominant_emotion)) {
@@ -151,7 +163,7 @@ async function endSession(req, res) {
     }
   }
 
-  res.json({ message: '세션이 종료되었습니다.' });
+  res.json({ message: '세션이 종료되었습니다.', missions: todayMissions });
 }
 
 // 내 세션 목록 조회 (페이지네이션)

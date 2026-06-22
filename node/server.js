@@ -6,6 +6,14 @@ require('dotenv').config({ path: '../.env' });
 const routes = require('./routes/index');
 const { errorHandler } = require('./middleware/errorHandler');
 
+// 모든 응답의 시각 필드를 한국 시간(KST, +09:00) ISO 8601로 직렬화
+// res.json → JSON.stringify가 Date마다 toJSON을 호출하므로, 이 패치 하나로 전체 응답에 적용됨
+// 예: 2026-06-22T09:00:00.000+09:00
+Date.prototype.toJSON = function () {
+  const kst = new Date(this.getTime() + 9 * 60 * 60 * 1000);
+  return kst.toISOString().replace('Z', '+09:00');
+};
+
 const app = express();
 
 app.use(cors({ origin: process.env.FRONTEND_URL || '*', credentials: true }));
