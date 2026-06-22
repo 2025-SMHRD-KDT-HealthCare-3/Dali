@@ -31,6 +31,7 @@ const riskEventRepo = require('../repositories/riskEventRepository');
 const userRepo = require('../repositories/userRepository');
 const emotionAlertRepo = require('../repositories/emotionAlertRepository');
 const summaryRepo = require('../repositories/summaryRepository');
+const onboardingRepo = require('../repositories/onboardingRepository');
 const RISK_KEYWORDS = require('../assets/riskKeywords');
 
 // 음성 파일을 메모리에 올려두고 FastAPI STT로 전달하기 위해 메모리 스토리지 사용
@@ -133,12 +134,13 @@ async function chatRespond(req, res) {
   // - session     : 선택 감정 조회
   // - alerts      : 미확인 감정 주의 신호 (alert_context)
   // - summaries   : 최근 대화 요약 1-2개 (recent_summaries)
-  const [messages, user, session, alerts, summaries] = await Promise.all([
+  const [messages, user, session, alerts, summaries, onboarding] = await Promise.all([
     sessionRepo.findMessagesBySession(session_id),
     userRepo.findById(req.user.user_id),
     sessionRepo.findSessionById(session_id),
     emotionAlertRepo.findUnconfirmedByUserId(req.user.user_id),
     summaryRepo.findRecentByUserId(req.user.user_id, 2),
+    onboardingRepo.findAllByUser(req.user.user_id),  // q3(신경 쓰이는 영역) 조회용
   ]);
 
   // 세션 존재 여부 + 소유자 검증 (IDOR 방어)
@@ -146,15 +148,11 @@ async function chatRespond(req, res) {
     return res.status(403).json({ code: 'FORBIDDEN', message: '접근 권한이 없습니다.' });
   }
 
-  // 1차 키워드 감지 — 키워드가 있을 때만 LLM에 문맥 확인 요청
-  // 키워드 없으면 has_risk_keyword: false → LLM은 위기 체크 없이 일반 답변
-  // 키워드 있으면 has_risk_keyword: true → LLM이 전체 문맥 보고 실제 위기 여부 최종 판단
+  // 1차 키워드 감지 (Node) → has_risk_keyword로 FastAPI에 전달 → risk_gate가 2차 LLM 문맥 판단
+  // true면 FastAPI가 자체 스캔 생략하고 바로 LLM 판단 / false여도 FastAPI가 자체 목록으로 폴백 스캔
   // 공백 제거 후 매칭 — "죽고 싶어" → "죽고싶어" 로 정규화해서 띄어쓰기 변형 대응
   const normalized = utterance.replace(/\s/g, '');
   const hasRiskKeyword = RISK_KEYWORDS.some(keyword => normalized.includes(keyword));
-  const confirmed_count = hasRiskKeyword
-    ? await riskEventRepo.countBySessionId(session_id, req.user.user_id)
-    : 0;
 
   let fastapiRes;
   try {
@@ -165,7 +163,6 @@ async function chatRespond(req, res) {
         user_id:              req.user.user_id,
         utterance,
         has_risk_keyword:     hasRiskKeyword,
-        confirmed_count,
         // persona는 FastAPI 스키마상 str(필수, null 불가) → 미설정 시 명세 기본값 '공감형' 전달
         persona:              user?.persona || '공감형',
         selected_emotion:     session?.selected_emotion || null,
@@ -181,6 +178,8 @@ async function chatRespond(req, res) {
         })),
         // FastAPI는 recent_summaries를 문자열 배열로 받음 → context_summary만 추출
         recent_summaries:     summaries.map(s => s.context_summary),
+        // q3_answer: 온보딩 3번(신경 쓰이는 영역) 답변 — LLM 대화 맥락 보강용
+        q3_answer:            onboarding.find(r => r.question_no === 3)?.user_answer ?? null,
       },
       { headers: { 'X-Internal-API-Key': process.env.INTERNAL_API_KEY } }
     );
@@ -281,14 +280,15 @@ async function chatAudio(req, res) {
   }
 
   // 회원 + 세션이 있을 때만 FastAPI 페이로드용 데이터 조회
-  let messages = [], user = null, session = null, alerts = [], summaries = [];
+  let messages = [], user = null, session = null, alerts = [], summaries = [], onboarding = [];
   if (req.user && session_id) {
-    [messages, user, session, alerts, summaries] = await Promise.all([
+    [messages, user, session, alerts, summaries, onboarding] = await Promise.all([
       sessionRepo.findMessagesBySession(session_id),
       userRepo.findById(req.user.user_id),
       sessionRepo.findSessionById(session_id),
       emotionAlertRepo.findUnconfirmedByUserId(req.user.user_id),
       summaryRepo.findRecentByUserId(req.user.user_id, 2),
+      onboardingRepo.findAllByUser(req.user.user_id),  // q3(신경 쓰이는 영역) 조회용
     ]);
 
     // 세션 존재 여부 + 소유자 검증 (IDOR 방어)
@@ -299,9 +299,6 @@ async function chatAudio(req, res) {
 
   const normalized = utterance.replace(/\s/g, '');
   const hasRiskKeyword = RISK_KEYWORDS.some(keyword => normalized.includes(keyword));
-  const confirmed_count = hasRiskKeyword && req.user && session_id
-    ? await riskEventRepo.countBySessionId(session_id, req.user.user_id)
-    : 0;
 
   let fastapiRes;
   try {
@@ -312,7 +309,6 @@ async function chatAudio(req, res) {
         user_id:              req.user?.user_id || null,
         utterance,
         has_risk_keyword:     hasRiskKeyword,
-        confirmed_count,
         // persona는 FastAPI 스키마상 str(필수, null 불가) → 미설정 시 명세 기본값 '공감형' 전달
         persona:              user?.persona || '공감형',
         selected_emotion:     session?.selected_emotion || null,
@@ -326,6 +322,8 @@ async function chatAudio(req, res) {
         })),
         // FastAPI는 recent_summaries를 문자열 배열로 받음 → context_summary만 추출
         recent_summaries:     summaries.map(s => s.context_summary),
+        // q3_answer: 온보딩 3번(신경 쓰이는 영역) 답변 — 비회원은 온보딩 미저장이라 null
+        q3_answer:            onboarding.find(r => r.question_no === 3)?.user_answer ?? null,
       },
       { headers: { 'X-Internal-API-Key': process.env.INTERNAL_API_KEY } }
     );
