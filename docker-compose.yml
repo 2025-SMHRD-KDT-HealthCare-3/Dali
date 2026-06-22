@@ -22,8 +22,6 @@ services:
       - ./media:/app/media:ro
     env_file:
       - .env
-    environment:
-      - TZ=Asia/Seoul                      # 컨테이너 시간대 KST 고정
     depends_on:
       fastapi:
         condition: service_healthy        # fastapi가 "준비"될 때까지 대기
@@ -43,8 +41,6 @@ services:
       - ./fastapi:/app
     env_file:
       - .env
-    environment:
-      - TZ=Asia/Seoul                      # 컨테이너 시간대 KST 고정
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 10s
