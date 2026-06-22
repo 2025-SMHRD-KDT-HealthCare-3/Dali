@@ -64,6 +64,18 @@ function buildEmotionAnalysis(messages) {
 }
 
 
+/*
+ * getQ3Answer - 온보딩 q3(신경 쓰이는 영역) 답변 "텍스트" 추출
+ * - user_answer는 TINYINT(선택 번호)라 그대로 보내면 FastAPI(str 기대)가 422
+ * - 번호(user_answer)로 보기 컬럼(exp_1~exp_5)을 찾아 실제 텍스트를 반환
+ * - 온보딩 없으면(비회원 등) null
+ */
+function getQ3Answer(onboarding) {
+  const q3 = onboarding.find(r => r.question_no === 3);
+  return q3 ? (q3[`exp_${q3.user_answer}`] ?? null) : null;
+}
+
+
 // 위기 이벤트 저장 + 3회 시 세션 종료 — 응답은 호출부에서 처리
 async function saveRiskEvent({ user_id, session_id, matched_category }) {
   const prevCount = await riskEventRepo.countBySessionId(session_id, user_id);
@@ -179,7 +191,7 @@ async function chatRespond(req, res) {
         // FastAPI는 recent_summaries를 문자열 배열로 받음 → context_summary만 추출
         recent_summaries:     summaries.map(s => s.context_summary),
         // q3_answer: 온보딩 3번(신경 쓰이는 영역) 답변 — LLM 대화 맥락 보강용
-        q3_answer:            onboarding.find(r => r.question_no === 3)?.user_answer ?? null,
+        q3_answer:            getQ3Answer(onboarding),
       },
       { headers: { 'X-Internal-API-Key': process.env.INTERNAL_API_KEY } }
     );
@@ -323,7 +335,7 @@ async function chatAudio(req, res) {
         // FastAPI는 recent_summaries를 문자열 배열로 받음 → context_summary만 추출
         recent_summaries:     summaries.map(s => s.context_summary),
         // q3_answer: 온보딩 3번(신경 쓰이는 영역) 답변 — 비회원은 온보딩 미저장이라 null
-        q3_answer:            onboarding.find(r => r.question_no === 3)?.user_answer ?? null,
+        q3_answer:            getQ3Answer(onboarding),
       },
       { headers: { 'X-Internal-API-Key': process.env.INTERNAL_API_KEY } }
     );
