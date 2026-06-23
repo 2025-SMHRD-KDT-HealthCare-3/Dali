@@ -2,7 +2,7 @@
  * missionRepository - missions 테이블
  * - findById           : 미션 단건 조회 (소유자 검증용)
  * - findMissionsByUser : 사용자의 미션 목록 조회 (날짜 내림차순, 순번 오름차순)
- * - completeMission    : 미션 완료 처리 (is_completed = 'Y', completed_at 업데이트)
+ * - setMissionCompleted: 미션 완료 상태 토글 (Y=완료/시각기록, N=취소/시각NULL)
  * - createMissions     : 미션 3개 일괄 저장 (세션 종료 시 FastAPI 결과 저장)
  * - hasMissionsToday   : 오늘 미션 생성 여부 확인 (하루 1회 생성 중복 방지)
  * - findTodayMissions  : 오늘 미션 목록 조회 (세션 종료 후 프론트 반환용)
@@ -24,10 +24,12 @@ async function findMissionsByUser(user_id) {
   return rows;
 }
 
-async function completeMission(mission_id, user_id) {
+// 완료 상태 토글 — state='Y'면 완료(시각 기록), 'N'이면 취소(시각 NULL)
+// completed_at은 MySQL NOW()(KST, db.js의 SET time_zone='+09:00')로 기록 — JS-UTC Date 사용 금지
+async function setMissionCompleted(mission_id, user_id, state) {
   await pool.query(
-    "UPDATE missions SET is_completed = 'Y', completed_at = NOW() WHERE mission_id = ? AND user_id = ?",
-    [mission_id, user_id]
+    "UPDATE missions SET is_completed = ?, completed_at = IF(? = 'Y', NOW(), NULL) WHERE mission_id = ? AND user_id = ?",
+    [state, state, mission_id, user_id]
   );
 }
 
@@ -76,4 +78,4 @@ async function findRecentContents(user_id, days = 5) {
   return rows.map(r => r.mission_content);
 }
 
-module.exports = { findById, createMissions, findMissionsByUser, completeMission, hasMissionsToday, findTodayMissions, findRecentContents };
+module.exports = { findById, createMissions, findMissionsByUser, setMissionCompleted, hasMissionsToday, findTodayMissions, findRecentContents };

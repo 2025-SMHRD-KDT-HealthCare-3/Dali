@@ -50,7 +50,7 @@
  *
  * [회복 미션]
  * - GET    /api/missions                          회복 미션 조회
- * - PATCH  /api/missions/:id                      미션 완료 처리
+ * - PATCH  /api/missions/:id                      미션 완료/취소 토글
  *
  * [미디어]
  * - GET    /api/media/music                       음악 콘텐츠 조회
@@ -145,7 +145,7 @@ router.get('/reports/monthly', requireLogin, reportCtrl.getMonthlyReports);
 
 // 회복 미션
 router.get('/missions', requireLogin, missionCtrl.getMissions);
-router.patch('/missions/:id', requireLogin, missionCtrl.completeMission);
+router.patch('/missions/:id', requireLogin, missionCtrl.toggleMission);
 
 // 미디어 콘텐츠
 router.get('/media/music', requireLogin, mediaCtrl.getMusicMedia);
