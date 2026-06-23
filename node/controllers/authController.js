@@ -18,11 +18,13 @@
  * - deleteMe            : DELETE /api/users/me                     회원탈퇴
  */
 
+const crypto = require('crypto');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const axios = require('axios');
 const userRepo = require('../repositories/userRepository');
 const { sendPasswordResetEmail } = require('../config/mailer');
+const { setSession, clearSession, isReplaced } = require('../utils/sessionStore');
 
 // refresh_token 쿠키 설정값 — httpOnly로 JS에서 접근 불가, 7일 유지
 const REFRESH_COOKIE_OPTIONS = {
@@ -93,27 +95,31 @@ function clearLoginFailures(email) {
 }
 
 // 액세스 토큰 생성 — 유효기간 15분, Authorization 헤더로 전달
-function generateAccessToken(user) {
+// sid: 세션 식별자 (중복 로그인 차단용 — sessionStore의 현재 sid와 대조)
+function generateAccessToken(user, sid) {
   return jwt.sign(
-    { user_id: user.user_id, email: user.email },
+    { user_id: user.user_id, email: user.email, sid },
     process.env.JWT_SECRET,
     { expiresIn: '15m' }
   );
 }
 
 // 리프레시 토큰 생성 — 유효기간 7일, httpOnly 쿠키로 전달
-function generateRefreshToken(user) {
+function generateRefreshToken(user, sid) {
   return jwt.sign(
-    { user_id: user.user_id, email: user.email },
+    { user_id: user.user_id, email: user.email, sid },
     process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET,
     { expiresIn: '7d' }
   );
 }
 
-// 두 토큰을 한 번에 발급 — 리프레시는 쿠키에 저장, 액세스는 반환
+// 두 토큰을 한 번에 발급 — 새 세션 식별자(sid)를 만들어 sessionStore에 등록하면
+// 같은 계정의 이전 기기 토큰은 sid가 달라져 차단된다(단일 세션 강제).
 function issueTokens(res, user) {
-  const access_token = generateAccessToken(user);
-  const refresh_token = generateRefreshToken(user);
+  const sid = crypto.randomUUID();
+  setSession(user.user_id, sid);
+  const access_token = generateAccessToken(user, sid);
+  const refresh_token = generateRefreshToken(user, sid);
   res.cookie('refresh_token', refresh_token, REFRESH_COOKIE_OPTIONS);
   return access_token;
 }
@@ -191,7 +197,9 @@ async function login(req, res) {
 }
 
 // 로그아웃 — refresh_token 쿠키 삭제 (설정 시와 동일한 옵션으로 삭제해야 실제로 지워짐)
+// sessionStore에서도 세션 제거 (requireLogin을 거치므로 req.user 존재)
 async function logout(req, res) {
+  clearSession(req.user.user_id);
   res.clearCookie('refresh_token', { httpOnly: true, sameSite: 'lax' });
   res.json({ message: '로그아웃 되었습니다.' });
 }
@@ -210,11 +218,20 @@ async function refresh(req, res) {
     return res.status(401).json({ code: 'INVALID_TOKEN', message: '유효하지 않거나 만료된 리프레시 토큰입니다.' });
   }
 
+  // 다른 기기에서 새로 로그인해 세션이 교체되었으면 재발급 거부 (중복 로그인 방지)
+  if (isReplaced(payload.user_id, payload.sid)) {
+    return res.status(401).json({ code: 'SESSION_REPLACED', message: '다른 기기에서 로그인되어 로그아웃되었습니다.' });
+  }
+
   // 유저가 실제로 존재하는지 확인
   const user = await userRepo.findById(payload.user_id);
   if (!user) return res.status(401).json({ code: 'UNAUTHORIZED', message: '사용자를 찾을 수 없습니다.' });
 
-  const access_token = generateAccessToken(user);
+  // 서버 재시작 등으로 sessionStore가 비어 있으면 이 토큰의 sid로 복원(완화 설계)
+  setSession(payload.user_id, payload.sid);
+
+  // 기존 sid를 유지해 새 액세스 토큰 발급
+  const access_token = generateAccessToken(user, payload.sid);
   // user 정보도 함께 반환 — 새로고침 후 프론트에서 유저 상태 복원에 사용
   res.json({ access_token, user });
 }
