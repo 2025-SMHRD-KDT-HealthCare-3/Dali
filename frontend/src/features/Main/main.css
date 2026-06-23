@@ -102,8 +102,8 @@
   width: calc(100% + 40px);
   margin-left: -20px;
   height: auto;
-  object-fit: cover;
-  object-position: center center;
+  object-fit: contain;
+  object-position: center top;
   flex-shrink: 0;
   display: block;
   margin-bottom: 2px;
@@ -540,6 +540,6 @@
 }
 
 @media (max-height: 700px) {
-  .main-logo  { height: 90px; }
+  .main-logo  { height: auto; max-height: 90px; }
   .main-orbit-wrap { transform: scale(0.88); transform-origin: center top; }
 }

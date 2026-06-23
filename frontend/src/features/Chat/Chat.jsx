@@ -156,6 +156,15 @@ const Chat = () => {
   // 마운트 시 세션 복원 or 신규 시작 (authLoading 끝난 뒤 실행)
   useEffect(() => {
     if (authLoading) return
+
+    // 비회원: sessionStorage 복원 없이 항상 first_visit 인사로 시작
+    if (!isAuthenticated) {
+      setGreetingType('first_visit')
+      setMessages([{ id: Date.now(), role: 'dali', text: GREETING_MESSAGES.first_visit, time: now() }])
+      return
+    }
+
+    // 회원: sessionStorage 복원 or 신규 세션 시작
     const saved = sessionStorage.getItem(STORAGE_KEY)
     if (saved) {
       try {
