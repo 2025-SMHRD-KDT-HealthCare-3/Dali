@@ -3,9 +3,9 @@ fastapi/services/pipeline/chatbot/risk_gate.py
 ==================================
 위험 감지 파이프라인 (2단계)
 
-1단계: Node의 riskKeywords.js 1차 감지 결과 수신 (has_risk_keyword)
-       FastAPI 내부 키워드 목록은 Node가 누락했을 때의 폴백용
-2단계: 키워드 감지 시 LLM 문맥 판단 — 비유/과장 vs 실제 위험 구분
+1단계: omni-moderation-latest — 의미 기반 위험 탐지 (키워드 매칭 대체)
+       Node has_risk_keyword=True 이면 스킵 (Node가 이미 감지한 경우)
+2단계: 1단계 통과 시 GPT Judge — 비유/과장 vs 실제 위험 문맥 판단
 
 반환 risk_level:
   none     — 위험 아님, 일반 공감 대화
@@ -21,24 +21,21 @@ fastapi/services/pipeline/chatbot/risk_gate.py
 import json
 import re
 
-from services.pipeline.common.llm_client import call_llm
+from services.pipeline.common.llm_client import call_llm, _get_client
 from services.pipeline.common.llm_models import RISK_MODEL
 
-_RISK_KEYWORDS: dict[str, list[str]] = {
-    "suicide": [
-        "죽고 싶", "자살", "목숨 끊", "사라지고 싶", "안 살고 싶",
-        "살기 싫", "죽어버리", "죽어야", "스스로 목",
-    ],
-    "self_harm": [
-        "자해", "긋고 싶", "베고 싶", "다치고 싶",
-    ],
-    "violence": [
-        "죽이고 싶", "때리고 싶", "칼로 찌르", "폭력",
-    ],
-    "farewell": [
-        "마지막 인사", "유서", "작별", "이제 안녕",
-    ],
-}
+# omni-moderation-latest 카테고리 → 내부 카테고리 매핑
+# 우선순위 순서 (높은 위험도부터)
+_MODERATION_CATEGORY_MAP: list[tuple[str, str]] = [
+    ("self_harm_intent",        "suicide"),
+    ("self_harm",               "self_harm"),
+    ("self_harm_instructions",  "self_harm"),
+    ("violence",                "violence"),
+    ("violence_graphic",        "violence"),
+]
+
+# 이 점수 이상이면 GPT Judge 호출 (높은 recall 우선 — 오탐은 Judge가 걸러냄)
+_MODERATION_THRESHOLD = 0.3
 
 _JUDGE_PROMPT = """\
 당신은 감정 회복 챗봇의 위기 신호 판단 보조 AI입니다.
@@ -90,6 +87,27 @@ _FACTOR_KEYS = (
 )
 
 
+async def _check_moderation(text: str) -> dict | None:
+    """omni-moderation-latest 호출.
+
+    임계치(_MODERATION_THRESHOLD) 이상인 위험 카테고리가 있으면
+    {"category": <내부 카테고리>} 반환, 없으면 None.
+    """
+    try:
+        client = _get_client()
+        result = await client.moderations.create(
+            input=text,
+            model="omni-moderation-latest",
+        )
+        scores: dict = result.results[0].category_scores.model_dump()
+        for field, internal_cat in _MODERATION_CATEGORY_MAP:
+            if (scores.get(field) or 0.0) >= _MODERATION_THRESHOLD:
+                return {"category": internal_cat}
+    except Exception:
+        pass
+    return None
+
+
 async def detect_risk_with_context(
     utterance: str,
     history: list[dict],
@@ -113,13 +131,12 @@ async def detect_risk_with_context(
         - none/watch: matched_category=None, 판단 요소 포함하지 않음
         - risk/critical: matched_category 포함, 판단 요소 반환 (Node가 judge_factors로 저장)
     """
-    # 1단계: 키워드 확인 (Node가 이미 감지했으면 스캔 생략)
+    # 1단계: omni-moderation-latest 의미 기반 탐지 (Node가 이미 감지했으면 생략)
     if not has_risk_keyword:
-        for category, keywords in _RISK_KEYWORDS.items():
-            if any(kw in utterance for kw in keywords):
-                matched_category = category
-                has_risk_keyword = True
-                break
+        mod = await _check_moderation(utterance)
+        if mod:
+            has_risk_keyword = True
+            matched_category = matched_category or mod["category"]
 
     if not has_risk_keyword:
         return _no_risk_result()

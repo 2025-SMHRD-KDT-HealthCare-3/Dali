@@ -7,8 +7,18 @@ import './report.css'
 import { reportApi } from '../../api/reports'
 import { emotionAlertApi } from '../../api/emotionAlerts'
 import { missionApi } from '../../api/missions'
+import { logAnalysisApi } from '../../api/logAnalysis'
 
 /* ── 감정 팔레트 ── */
+const EMOTION_SCORE_FIELD = {
+  '기쁨': 'joy_score',
+  '슬픔': 'sad_score',
+  '불안': 'anxiety_score',
+  '분노': 'anger_score',
+  '상처': 'hurt_score',
+  '당황': 'embarrass_score',
+}
+
 const EMOTIONS = {
   '기쁨': { color: '#FFD746', bg: 'rgba(255, 215, 70, 0.18)',   emoji: '😊' },
   '불안': { color: '#B39BFF', bg: 'rgba(179, 155, 255, 0.18)', emoji: '😰' },
@@ -109,13 +119,24 @@ const Report = () => {
   const [missions,       setMissions]       = useState([])
   const [dailyLoading,   setDailyLoading]   = useState(false)
   const [monthlyLoading, setMonthlyLoading] = useState(false)
+  const [sessionAnalyses, setSessionAnalyses] = useState({})
 
   const loadDaily = useCallback((date) => {
     setDailyLoading(true)
+    setSessionAnalyses({})
     reportApi.getDaily(formatDate(date))
       .then(res => {
         setDailyReview(res.one_line_review || null)
-        setDailyReports(res.reports || [])
+        const reports = res.reports || []
+        setDailyReports(reports)
+        const ids = reports.map(r => r.session_id).filter(Boolean)
+        Promise.all(
+          ids.map(id => logAnalysisApi.getLogAnalyses(id).catch(() => ({ analyses: [] })))
+        ).then(results => {
+          const map = {}
+          ids.forEach((id, i) => { map[id] = results[i].analyses || [] })
+          setSessionAnalyses(map)
+        })
       })
       .catch(() => { setDailyReview(null); setDailyReports([]) })
       .finally(() => setDailyLoading(false))
@@ -328,8 +349,16 @@ const Report = () => {
                   const ue = EMOTIONS[r.selected_emotion]
                   const me = EMOTIONS[r.dominant_emotion]
                   const ratios = toRatios(r)
-                  const userRatio  = ratios.find(rt => rt.label === r.selected_emotion)?.pct || 0
-                  const modelRatio = ratios.find(rt => rt.label === r.dominant_emotion)?.pct  || 0
+
+                  const analyses   = sessionAnalyses[r.session_id] || []
+                  const userField  = EMOTION_SCORE_FIELD[r.selected_emotion]
+                  const modelField = EMOTION_SCORE_FIELD[r.dominant_emotion]
+                  const userScores  = analyses.map(a => +(a[userField]  || 0))
+                  const modelScores = analyses.map(a => +(a[modelField] || 0))
+                  const userLinePath  = generateTrendLinePath(userScores)
+                  const modelLinePath = generateTrendLinePath(modelScores)
+                  const analysesLoaded = r.session_id in sessionAnalyses
+
                   return (
                     <div key={r.report_id} className="rp-session-card">
 
@@ -339,7 +368,7 @@ const Report = () => {
                         <span className="rp-session-time">{timeLabel(r.created_at)}</span>
                       </div>
 
-                      {/* 감정 비교 (수학 함수형 물결 그래프) */}
+                      {/* 감정 변화 그래프 — 말풍선별 감정 점수 추이 */}
                       <div className="rp-math-compare">
                         <div className="rp-math-header">
                           <div className="rp-math-item">
@@ -358,8 +387,14 @@ const Report = () => {
 
                         <div className="rp-math-graph">
                           <svg viewBox="0 0 300 100" className="rp-math-svg" preserveAspectRatio="none">
-                            <g><path d={generateMathWave(userRatio)}  fill="none" stroke={ue?.color || '#ccc'} strokeWidth="2.5" /></g>
-                            <g><path d={generateMathWave(modelRatio)} fill="none" stroke={me?.color || '#ccc'} strokeWidth="2.5" /></g>
+                            {userLinePath  && <path d={userLinePath}  fill="none" stroke={ue?.color  || '#ccc'} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />}
+                            {modelLinePath && <path d={modelLinePath} fill="none" stroke={me?.color || '#ccc'} strokeWidth="2"   strokeLinecap="round" strokeLinejoin="round" strokeDasharray="6 3" />}
+                            {analysesLoaded && !userLinePath && !modelLinePath && (
+                              <text x="150" y="55" textAnchor="middle" fill="currentColor" fontSize="11" opacity="0.35">감정 분석 데이터가 없어요</text>
+                            )}
+                            {!analysesLoaded && (
+                              <text x="150" y="55" textAnchor="middle" fill="currentColor" fontSize="11" opacity="0.35">불러오는 중...</text>
+                            )}
                           </svg>
                         </div>
                       </div>
