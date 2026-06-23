@@ -316,185 +316,23 @@
 
 /* ── 조개탑 스테이지 ── */
 
-.shell-stage {
-  position: relative;
+/* ── 게이미피케이션 영상 스테이지 ── */
+
+.mission-stage {
   display: flex;
-  align-items: flex-end;
   justify-content: center;
-  gap: 20px;
-  padding: 28px 20px 24px;
+  align-items: center;
   background: rgba(var(--rgb-white), 0.04);
   border: 1px solid rgba(var(--rgb-purple-lavender), 0.12);
   border-radius: 24px;
-  min-height: 190px;
   overflow: hidden;
 }
 
-/* 스테이지 배경 글로우 */
-.shell-stage::before {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 70%;
-  height: 60%;
-  background: radial-gradient(ellipse at bottom, rgba(100, 70, 200, 0.18) 0%, transparent 70%);
-  pointer-events: none;
-}
-
-/* 스테이지 내 별 */
-.shell-bg-star {
-  position: absolute;
-  color: var(--color-moon);
-  pointer-events: none;
-  animation: star-twinkle 3s ease-in-out infinite;
-  opacity: 0;
-}
-
-.shell-bg-star.sbs1 { top: 18%; left:  16%; font-size: 10px; animation-delay: 0.4s; }
-.shell-bg-star.sbs2 { top: 22%; right: 18%; font-size:  7px; animation-delay: 1.3s; }
-.shell-bg-star.sbs3 { top: 55%; left:  28%; font-size:  8px; animation-delay: 0.9s; }
-
-/* 조개탑 래퍼 */
-.shell-tower-wrap {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-end;
-  height: 150px;
-  position: relative;
-  flex-shrink: 0;
-}
-
-/* 조개탑 아래 글로우 그림자 */
-.shell-tower-wrap::after {
-  content: '';
-  position: absolute;
-  bottom: -6px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 56px;
-  height: 14px;
-  background: radial-gradient(ellipse, rgba(var(--rgb-purple-glow), 0.55) 0%, transparent 70%);
-  border-radius: 50%;
-  animation: shell-glow-pulse 2.5s ease-in-out infinite;
-}
-
-@keyframes shell-glow-pulse {
-  0%, 100% { opacity: 0.5; transform: translateX(-50%) scaleX(0.85); }
-  50%       { opacity: 1;   transform: translateX(-50%) scaleX(1.25); }
-}
-
-/* 조개탑 (column-reverse = 첫 번째 아이템이 시각적 바닥) */
-.shell-tower {
-  display: flex;
-  flex-direction: column-reverse;
-  align-items: center;
-  gap: 1px;
-}
-
-/* 조개 */
-.shell-item {
-  font-size: 36px;
-  line-height: 1;
-  display: block;
-  filter: drop-shadow(0 2px 8px rgba(var(--rgb-purple-lavender), 0.65));
-}
-
-/* 새로 추가된 조개 팝 애니메이션 */
-.shell-item.just-added {
-  animation: shell-pop 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) both;
-}
-
-@keyframes shell-pop {
-  0%   { transform: scale(0.2) translateY(20px); opacity: 0; }
-  55%  { transform: scale(1.3) translateY(-5px);  opacity: 1; }
-  100% { transform: scale(1)   translateY(0);     opacity: 1; }
-}
-
-/* 조개 0개일 때 힌트 */
-.shell-empty-hint {
-  font-size: var(--fs-caption);
-  color: rgba(var(--rgb-white), 0.28);
-  text-align: center;
-  line-height: 1.7;
-  margin: 0;
-  position: absolute;
-  bottom: 10px;
-  white-space: nowrap;
-}
-
-/* 달리 캐릭터 */
-.stage-dali-img {
-  height: 150px;
-  width: auto;
-  object-fit: contain;
-  filter: drop-shadow(0 8px 22px rgba(120, 90, 220, 0.45));
-  flex-shrink: 0;
-  align-self: flex-end;
-}
-
-/* ── 조개탑 영상 오버레이 ── */
-.shell-video-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.88);
-  z-index: 200;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.shell-video-player {
+.mission-stage-video {
   width: 100%;
-  max-width: 420px;
-  max-height: 80vh;
-  border-radius: 20px;
+  height: auto;
   display: block;
   object-fit: contain;
-}
-
-.shell-video-close {
-  position: absolute;
-  top: 20px;
-  right: 20px;
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.15);
-  border: none;
-  color: #fff;
-  font-size: 18px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  backdrop-filter: blur(8px);
-}
-
-/* 토스트 메시지 */
-.shell-toast {
-  align-self: center;
-  padding: 11px 22px;
-  background: linear-gradient(135deg, rgba(var(--rgb-purple-vivid), 0.9) 0%, rgba(var(--rgb-purple-glow), 0.9) 100%);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(var(--rgb-purple-lavender), 0.35);
-  border-radius: 999px;
-  color: #fff;
-  font-size: var(--fs-meta);
-  font-weight: var(--fw-semibold);
-  letter-spacing: 0.1px;
-  text-align: center;
-  animation: toast-appear 2.5s ease forwards;
-  pointer-events: none;
-}
-
-@keyframes toast-appear {
-  0%   { opacity: 0; transform: translateY(8px) scale(0.94); }
-  12%  { opacity: 1; transform: translateY(0)   scale(1);    }
-  72%  { opacity: 1; }
-  100% { opacity: 0; transform: translateY(-5px) scale(0.97); }
 }
 
 /* ── 음악/영상 탭 ── */
@@ -659,15 +497,10 @@
   color: var(--color-purple-accent);
 }
 
-/* 조개탑 스테이지 */
-[data-theme="light"] .shell-stage {
+/* 게이미피케이션 스테이지 */
+[data-theme="light"] .mission-stage {
   background: rgba(var(--rgb-white), 0.55);
   border-color: rgba(var(--rgb-purple-accent), 0.12);
-}
-[data-theme="light"] .shell-bg-star    { color: var(--color-purple-bright); }
-[data-theme="light"] .shell-empty-hint { color: rgba(var(--rgb-primary), 0.3); }
-[data-theme="light"] .shell-toast {
-  background: linear-gradient(135deg, rgba(var(--rgb-purple-vivid), 0.88) 0%, rgba(var(--rgb-purple-bright), 0.88) 100%);
 }
 
 .mission-theme-toggle {
