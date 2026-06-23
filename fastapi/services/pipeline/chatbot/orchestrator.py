@@ -45,16 +45,30 @@ def _get_scores(utterance: str, history: list[dict]) -> dict:
     return {KR_TO_FIELD[e]: scores[e] for e in EMOTIONS}
 
 
-def _derive_service_state(risk_level: str, prior_risk_count: int) -> dict:
-    """risk_level + 세션 내 기존 risk 횟수 → 서비스 상태 계산.
+def _derive_service_state(
+    risk_level: str,
+    prior_risk_count: int,
+    matched_category: str | None = None,
+) -> dict:
+    """risk_level + matched_category + 세션 내 기존 risk 횟수 → 서비스 상태 계산.
 
     반환값은 모두 파생 상태값으로 DB에 저장하지 않는다.
 
     Args:
-        risk_level:       LLM 판단 결과 (none|watch|risk|critical)
+        risk_level:       GPT Judge 판단 결과 (none|watch|risk|critical)
         prior_risk_count: 이번 요청 이전 세션 내 risk 레벨 이벤트 수
-                          (Node가 risk_events WHERE risk_level='risk' 집계 후 전달)
+        matched_category: 감지된 위험 카테고리 (suicide|self_harm|violence|farewell|unknown)
     """
+    # 폭력 의도 확인 → 누적 횟수 무관, 즉시 안전모드 (자해·자살 정책과 독립)
+    if matched_category == "violence":
+        return {
+            "service_action": "urgent_safety_mode",
+            "response_mode": "fixed_safety",
+            "safety_mode": True,
+            "should_block_chat": True,
+            "show_hotline": True,
+        }
+
     if risk_level in ("none", "watch"):
         return {
             "service_action": "normal_empathy",
@@ -65,7 +79,6 @@ def _derive_service_state(risk_level: str, prior_risk_count: int) -> dict:
         }
 
     if risk_level == "critical":
-        # critical 1회만으로 즉시 안전모드
         return {
             "service_action": "urgent_safety_mode",
             "response_mode": "fixed_safety",
@@ -75,8 +88,7 @@ def _derive_service_state(risk_level: str, prior_risk_count: int) -> dict:
         }
 
     # risk 레벨 — 이번 포함 누적 횟수로 분기
-    risk_count_after = prior_risk_count + 1
-    if risk_count_after < 3:
+    if prior_risk_count + 1 < 3:
         return {
             "service_action": "offer_support_choice",
             "response_mode": "cautious",
@@ -124,10 +136,11 @@ async def run_chat(req: ChatRequest) -> dict:
         has_risk_keyword=req.has_risk_keyword,
         matched_category=req.matched_category,
     )
-    risk_level = risk["risk_level"]
+    risk_level       = risk["risk_level"]
+    matched_category = risk.get("matched_category")
 
     # 3) 서비스 상태 계산 (파생 상태값, DB 저장 안 함)
-    service_state = _derive_service_state(risk_level, req.prior_risk_count)
+    service_state = _derive_service_state(risk_level, req.prior_risk_count, matched_category)
 
     # judge_factors — risk/critical 시에만 반환 (Node가 risk_events.judge_factors에 JSON 저장)
     judge_factors = (
@@ -138,9 +151,9 @@ async def run_chat(req: ChatRequest) -> dict:
 
     base = {
         "risk_level": risk_level,
-        "matched_category": risk.get("matched_category"),
+        "matched_category": matched_category,
         **service_state,
-        # 이 이벤트가 안전모드를 처음 트리거하는지 여부 — Node가 risk_events에 'Y'/'N'으로 저장
+        # 이 이벤트가 안전모드를 처음 트리거하는지 여부 — Node가 risk_events에 저장
         "safety_mode_triggered": service_state["should_block_chat"],
         "judge_factors": judge_factors,
         **col_scores,
@@ -148,7 +161,13 @@ async def run_chat(req: ChatRequest) -> dict:
 
     # 4) 안전모드 전환 → 고정 응답 반환 (LLM 스킵)
     if service_state["response_mode"] == "fixed_safety":
-        return {"reply": get_safety_response(service_state["service_action"]), **base}
+        # violence는 전용 안전 응답 사용
+        response_key = (
+            "violence_urgent_safety_mode"
+            if matched_category == "violence"
+            else service_state["service_action"]
+        )
+        return {"reply": get_safety_response(response_key), **base}
 
     # 5 & 6) LLM 응답 생성 (cautious 또는 normal)
     emotion_analysis = (

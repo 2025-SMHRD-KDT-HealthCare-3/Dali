@@ -11,6 +11,8 @@ import { useTheme }   from '../../contexts/ThemeContext'
 import ThemeToggle    from '../Public/ThemeToggle'
 import MessageBubble  from '../Public/MessageBubble'
 import TypingBubble   from '../Public/TypingBubble'
+import { SendIcon }   from '../Public/Icons'
+import { formatTime } from '../Public/timeUtils'
 
 // Main.jsx 감정 ID → 한국어 이름 (세션 selected_emotion으로 전달)
 const EMOTION_LABEL = {
@@ -50,13 +52,6 @@ function getQuickReplies({ greetingType, selectedEmotion, alertContext }) {
   return QUICK_REPLIES.default
 }
 
-const now = () => {
-  const d = new Date()
-  const hh = d.getHours()
-  const mm = String(d.getMinutes()).padStart(2, '0')
-  return `${hh < 12 ? '오전' : '오후'} ${hh % 12 || 12}:${mm}`
-}
-
 const BackIcon = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
     <path d="M19 12H5M12 5l-7 7 7 7"/>
@@ -68,12 +63,6 @@ const MicIcon = () => (
     <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
     <line x1="12" y1="19" x2="12" y2="23"/>
     <line x1="8" y1="23" x2="16" y2="23"/>
-  </svg>
-)
-const SendIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-    <line x1="22" y1="2" x2="11" y2="13"/>
-    <polygon points="22 2 15 22 11 13 2 9 22 2"/>
   </svg>
 )
 
@@ -146,7 +135,7 @@ const Chat = () => {
         setShowAlertCard(true)
       } else {
         const greetText = GREETING_MESSAGES[type] ?? GREETING_MESSAGES.today_first
-        setMessages([{ id: Date.now(), role: 'dali', text: greetText, time: now() }])
+        setMessages([{ id: Date.now(), role: 'dali', text: greetText, time: formatTime() }])
       }
     } catch (err) {
       console.error('[chat] 세션 시작 실패:', err)
@@ -160,7 +149,7 @@ const Chat = () => {
     // 비회원: sessionStorage 복원 없이 항상 first_visit 인사로 시작
     if (!isAuthenticated) {
       setGreetingType('first_visit')
-      setMessages([{ id: Date.now(), role: 'dali', text: GREETING_MESSAGES.first_visit, time: now() }])
+      setMessages([{ id: Date.now(), role: 'dali', text: GREETING_MESSAGES.first_visit, time: formatTime() }])
       return
     }
 
@@ -213,7 +202,7 @@ const Chat = () => {
   const handleAlertContinue = () => {
     setShowAlertCard(false)
     const greetText = GREETING_MESSAGES.emotion_alert.replace('{감정}', alertContext?.alert_emotion ?? '')
-    setMessages([{ id: Date.now(), role: 'dali', text: greetText, time: now() }])
+    setMessages([{ id: Date.now(), role: 'dali', text: greetText, time: formatTime() }])
   }
 
   const handleAlertDismiss = () => {
@@ -222,9 +211,9 @@ const Chat = () => {
   }
 
   const addDali = (text) =>
-    setMessages(prev => [...prev, { id: Date.now() + Math.random(), role: 'dali', text, time: now() }])
+    setMessages(prev => [...prev, { id: Date.now() + Math.random(), role: 'dali', text, time: formatTime() }])
   const addUser = (text) =>
-    setMessages(prev => [...prev, { id: Date.now() + Math.random(), role: 'user', text, time: now(), read: false }])
+    setMessages(prev => [...prev, { id: Date.now() + Math.random(), role: 'user', text, time: formatTime(), read: false }])
 
   /* ── 자동 스크롤 ── */
   useEffect(() => {
@@ -324,49 +313,39 @@ const Chat = () => {
     clearTimeout(idleRef.current)
   }
 
-  /* ── 음성 전송 ── */
+  /* ── 음성 전송 (2단계 분리) ── */
+  // 1단계: STT만 호출 → utterance 말풍선 즉시 표시
+  // 2단계: 일반 sendBatch로 챗봇 파이프라인 위임
   const sendAudio = async (blob) => {
     if (isRisk) return
     if (!hasSentFirst) setHasSentFirst(true)
 
     const placeholderId = Date.now() + Math.random()
-    setMessages(prev => [...prev, { id: placeholderId, role: 'user', text: '🎤 음성 인식 중...', time: now(), read: false }])
+    setMessages(prev => [...prev, { id: placeholderId, role: 'user', text: '🎤 음성 인식 중...', time: formatTime(), read: false }])
 
-    // 달리가 응답 중이면 음성도 큐에 넣지 않고 독립 전송 (STT 결과가 필요하므로)
-    isTypingRef.current = true
-    setIsTyping(true)
     try {
       const formData = new FormData()
       formData.append('audio', blob, 'recording.webm')
-      if (isAuthenticated && sessionIdRef.current) {
-        formData.append('session_id', String(sessionIdRef.current))
+      const { utterance } = await chatApi.sendAudioStt(formData)
+
+      if (!utterance) {
+        setMessages(prev => prev.map(m => m.id === placeholderId ? { ...m, text: '🎤 (인식 실패)' } : m))
+        addDali('음성을 인식하지 못했어요. 다시 시도해주세요.')
+        return
       }
-      const res = await chatApi.sendAudio(formData)
 
-      const displayText = res.utterance || '🎤 음성 메시지'
-      setMessages(prev => prev.map(m => m.id === placeholderId ? { ...m, text: displayText } : m))
+      // STT 완료 — 말풍선 텍스트 즉시 교체 (사용자가 뭐라고 말했는지 바로 확인)
+      setMessages(prev => prev.map(m => m.id === placeholderId ? { ...m, text: utterance } : m))
 
-      if (res.is_risk) {
-        setIsRisk(true)
-        setSessionId(null)
-        sessionIdRef.current = null
-        pendingQueueRef.current = []
-        addDali('지금 많이 힘드신 것 같아요. 혼자 버티지 않아도 돼요.\n\n📞 자살예방상담전화: 1393\n📞 정신건강위기상담전화: 1577-0199\n\n언제든 다시 찾아와 주세요 🌙')
+      // 일반 채팅 파이프라인으로 전달 (달리가 응답 중이면 큐에 적재)
+      if (isTypingRef.current) {
+        pendingQueueRef.current.push(utterance)
       } else {
-        addDali(res.reply || '...')
+        sendBatch([utterance])
       }
     } catch {
-      setMessages(prev => prev.map(m => m.id === placeholderId ? { ...m, text: '🎤 음성 메시지' } : m))
-      addDali('죄송해요, 음성 전송에 실패했어요. 다시 시도해주세요.')
-    } finally {
-      isTypingRef.current = false
-      setIsTyping(false)
-
-      if (pendingQueueRef.current.length > 0) {
-        const queued = [...pendingQueueRef.current]
-        pendingQueueRef.current = []
-        sendBatch(queued)
-      }
+      setMessages(prev => prev.map(m => m.id === placeholderId ? { ...m, text: '🎤 (전송 실패)' } : m))
+      addDali('죄송해요, 음성 인식에 실패했어요. 다시 시도해주세요.')
     }
   }
 

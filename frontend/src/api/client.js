@@ -58,21 +58,31 @@ async function request(path, { method = 'GET', body, auth = true, retry = true, 
     ...(body !== undefined ? { body: rawBody ? body : JSON.stringify(body) } : {}),
   })
 
-  // 401 → 재발급 성공 시 원래 요청 1회 재시도
-  if (res.status === 401 && auth && retry) {
-    const refreshed = await tryRefresh()
-    if (refreshed) {
-      return request(path, { method, body, auth, retry: false })
-    }
-  }
-
-  // 응답 파싱 (JSON / 텍스트 자동 구분)
+  // 응답 파싱 (JSON / 텍스트 자동 구분) — 401 코드 확인을 위해 먼저 파싱
   let data
   const contentType = res.headers.get('Content-Type') || ''
-  if (contentType.includes('application/json')) {
-    data = await res.json()
-  } else {
-    data = await res.text()
+  try {
+    data = contentType.includes('application/json') ? await res.json() : await res.text()
+  } catch {
+    data = null
+  }
+
+  // 401 처리
+  if (res.status === 401 && auth) {
+    // 다른 기기 로그인으로 세션 교체 → 토큰 비우고 로그인 화면으로
+    if (data?.code === 'SESSION_REPLACED') {
+      _accessToken = null
+      sessionStorage.setItem('auth_notice', '다른 기기에서 로그인되어 자동으로 로그아웃되었습니다.')
+      window.location.replace('/auth')
+      throw new ApiError(401, 'SESSION_REPLACED', data.message)
+    }
+    // 일반 401 → 재발급 성공 시 원래 요청 1회 재시도
+    if (retry) {
+      const refreshed = await tryRefresh()
+      if (refreshed) {
+        return request(path, { method, body, auth, retry: false, rawBody })
+      }
+    }
   }
 
   if (!res.ok) {

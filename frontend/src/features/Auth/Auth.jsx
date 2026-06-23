@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import './Auth.css'
 import Login from './Login'
@@ -21,6 +21,15 @@ const Auth = () => {
     searchParams.get('tab') === 'signup' ? 'signup' : 'login'
   )
   const { isDark } = useTheme()
+  const [notice, setNotice] = useState('')
+
+  useEffect(() => {
+    const msg = sessionStorage.getItem('auth_notice')
+    if (msg) {
+      setNotice(msg)
+      sessionStorage.removeItem('auth_notice')
+    }
+  }, [])
 
   return (
     <div className="auth-form-panel">
@@ -54,6 +63,10 @@ const Auth = () => {
               회원가입
             </button>
           </div>
+
+          {notice && (
+            <div className="auth-notice">{notice}</div>
+          )}
 
           {activeTab === 'login'
             ? <Login onTabChange={setActiveTab} />

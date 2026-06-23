@@ -42,12 +42,12 @@ _JUDGE_PROMPT = """\
 아래 사용자 발화와 최근 대화 맥락을 보고 실제 자살·자해·폭력 위험 수준을 판단하세요.
 
 중요:
-- 당신의 판단은 사용자를 바로 차단하기 위한 것이 아니라, 서비스가 안전하게 반응하기 위한 참고 신호입니다.
+- 당신의 역할은 risk_level, matched_category, judge_factors만 반환하는 것입니다.
+- 서비스 행동(service_action 등)은 Rule Engine이 별도로 결정합니다.
 - 비유, 과장, 농담, 감탄사, 가사 인용, 과거 회상은 실제 현재 위험으로 과대 판단하지 마세요.
-- 단, 현재 자해/자살/폭력 의도와 함께 구체적 방법·시점·계획·실행 가능성이 나타나면 critical로 판단하세요.
 
 판단 기준 (모든 항목은 현재 발화 기준):
-- intent: 죽고 싶다/다치고 싶다/해치고 싶다는 실제 의도가 있는가?
+- intent: 자신을 죽이거나 다치게 하려는 실제 의도, 또는 타인을 실제로 해치려는 의도가 있는가?
 - current: 지금 이 순간 그런 상태인가? (과거·가정이 아닌 현재)
 - plan: 구체적인 계획이 언급되었는가?
 - method: 방법이나 수단이 언급되었는가?
@@ -55,11 +55,25 @@ _JUDGE_PROMPT = """\
 - access_or_alone: 혼자 있음, 수단 접근 가능성 등 실행 환경이 언급되었는가?
 - metaphor_or_past: 비유·과장·농담·가사·과거 회상에 가까운가?
 
+matched_category 기준:
+- suicide: 자살 의도가 주된 경우
+- self_harm: 자해 행위에 초점이 맞춰진 경우
+- violence: 타인을 실제로 해치려는 의도가 명확한 경우
+  ※ 단순 분노·짜증 표현은 violence가 아님
+    예(violence 아님): "진짜 너무 화난다", "짜증나서 미치겠다", "한 대 치고 싶을 만큼 화난다"
+  ※ 실제 가해 의도가 확인되는 경우만 violence로 분류
+    예(violence): "그 사람 찾아가서 해치고 싶다", "칼로 찌르고 싶다", "죽여버리고 싶어"
+- farewell: 마지막 인사·유서·작별 등 이별 신호
+- unknown: 위험 신호는 있으나 카테고리를 특정하기 어려운 경우
+
 risk_level 기준:
-- none: 위험 아님. 비유·농담·가사 인용·과거 회상·일반 스트레스 표현
+- none: 위험 아님. 비유·농담·가사 인용·과거 회상·일반 스트레스·단순 분노 표현
 - watch: 힘듦이 크거나 모호한 위험 표현이 있으나 실제 의도는 불명확함
-- risk: 자해/자살/폭력 의도가 비교적 명확하지만 구체적 계획·방법·시점은 없음
-- critical: intent + current에 더해 plan·method·timeframe·access_or_alone 중 1개 이상이 함께 나타남
+- risk: 자해·자살 의도가 비교적 명확하지만 구체적 계획·방법·시점은 없음
+        ※ violence는 risk로 분류하지 않음
+- critical: 다음 중 하나에 해당하는 경우
+  (1) 자해·자살: intent + current에 더해 plan·method·timeframe·access_or_alone 중 1개 이상
+  (2) 타인 가해(violence): matched_category = "violence"이면 risk_level은 반드시 "critical"
 
 [사용자 발화]
 {utterance}

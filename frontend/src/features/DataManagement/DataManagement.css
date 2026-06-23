@@ -29,31 +29,7 @@
 
 /* inner 베이스 — common.css 전역 로드 */
 .dm-inner { padding: 20px 20px 40px; gap: 20px; }
-
-/* ── 헤더 ── */
-.dm-header {
-  display: flex;
-  align-items: center;
-  padding: 8px 0 4px;
-}
-.dm-back {
-  background: none;
-  border: none;
-  color: var(--text-primary);
-  font-size: 26px;
-  cursor: pointer;
-  padding: 4px 10px 4px 0;
-  line-height: 1;
-}
-.dm-title {
-  flex: 1;
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--text-primary);
-  text-align: center;
-  margin: 0;
-}
-.dm-header-end { width: 34px; }
+/* 헤더·백버튼·타이틀 — common.css 전역 로드 */
 
 /* ── 안내 카드 ── */
 .dm-info-card {

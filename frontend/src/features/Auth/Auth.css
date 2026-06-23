@@ -111,6 +111,18 @@
   display: none;
 }
 
+.auth-notice {
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  background: rgba(255, 90, 80, 0.12);
+  border: 1px solid rgba(255, 90, 80, 0.3);
+  color: #FF5A50;
+  font-size: 13px;
+  line-height: 1.5;
+  text-align: center;
+}
+
 /* ══════════════════════════════════════════════
    Header (뒤로가기 버튼)
 ══════════════════════════════════════════════ */

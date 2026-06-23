@@ -8,6 +8,7 @@ import { reportApi } from '../../api/reports'
 import { emotionAlertApi } from '../../api/emotionAlerts'
 import { missionApi } from '../../api/missions'
 import { logAnalysisApi } from '../../api/logAnalysis'
+import { formatTime } from '../Public/timeUtils'
 
 /* ── 감정 팔레트 ── */
 const EMOTION_SCORE_FIELD = {
@@ -37,13 +38,6 @@ const formatDate = (d) => {
 
 const formatMonth = (d) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-
-const timeLabel = (isoStr) => {
-  const d = new Date(isoStr)
-  const hh = d.getHours()
-  const mm = String(d.getMinutes()).padStart(2, '0')
-  return `${hh < 12 ? '오전' : '오후'} ${hh % 12 || 12}:${mm}`
-}
 
 /* ── 수학 함수형 물결 SVG 생성 ── */
 const generateMathWave = (pct) => {
@@ -365,7 +359,7 @@ const Report = () => {
                       {/* 세션 헤더 */}
                       <div className="rp-session-hdr">
                         <span className="rp-session-num">세션 {idx + 1}</span>
-                        <span className="rp-session-time">{timeLabel(r.created_at)}</span>
+                        <span className="rp-session-time">{formatTime(r.created_at)}</span>
                       </div>
 
                       {/* 감정 변화 그래프 — 말풍선별 감정 점수 추이 */}

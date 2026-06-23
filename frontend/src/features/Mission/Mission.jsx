@@ -22,18 +22,13 @@ import StarBg         from '../Public/StarBg'
 import { missionApi }  from '../../api/missions'
 import { reportApi }   from '../../api/reports'
 import Media           from './Media'
+import { CheckIcon }   from '../Public/Icons'
 
 const SEQ_STYLE = [
   { emoji: '🌙', color: '#9B7EFF', bg: 'rgba(155,126,255,0.18)' },
   { emoji: '🧘', color: '#E8A87C', bg: 'rgba(232,168,124,0.18)' },
   { emoji: '💧', color: '#7BCCE8', bg: 'rgba(123,204,232,0.18)' },
 ]
-
-const CheckIcon = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-    <polyline points="20 6 9 17 4 12" />
-  </svg>
-)
 
 const Mission = () => {
   const navigate = useNavigate()
@@ -80,11 +75,7 @@ const Mission = () => {
     setStageShouldPlay(completing)
 
     try {
-      if (completing) {
-        await missionApi.completeMission(mission_id)
-      } else {
-        await missionApi.uncompleteMission(mission_id)
-      }
+      await missionApi.setCompleted(mission_id, newState)
     } catch {
       // 실패 시 원복
       setMissions(prev => prev.map(m => m.mission_id === mission_id ? { ...m, is_completed: mission.is_completed } : m))

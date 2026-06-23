@@ -10,6 +10,8 @@ import { userApi } from '../../api/user'
 import { onboardingApi } from '../../api/onboarding'
 import MessageBubble from '../Public/MessageBubble'
 import TypingBubble  from '../Public/TypingBubble'
+import { SendIcon }   from '../Public/Icons'
+import { formatTime } from '../Public/timeUtils'
 
 /*
  * QUESTIONS 배열 구조
@@ -121,22 +123,9 @@ const PERSONA_TO_Q4_OPT = {
 
 const GREETING = '안녕하세요! 저는 달리예요 🌙\n처음 만나서 반가워요! 잠깐 몇 가지 여쭤봐도 될까요?'
 
-const nowStr = () => {
-  const d = new Date()
-  const hh = d.getHours()
-  const mm = String(d.getMinutes()).padStart(2, '0')
-  return `${hh < 12 ? '오전' : '오후'} ${hh % 12 || 12}:${mm}`
-}
-
-const SendIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-    <line x1="22" y1="2" x2="11" y2="13"/>
-    <polygon points="22 2 15 22 11 13 2 9 22 2"/>
-  </svg>
-)
 
 /* ── 컴포넌트 ── */
-const Onboarding = ({ registerToken = null }) => {
+const Onboarding = () => {
   const navigate   = useNavigate()
   const location   = useLocation()
   const { isDark } = useTheme()
@@ -197,9 +186,9 @@ const Onboarding = ({ registerToken = null }) => {
   const [recommendedOpt, setRecommendedOpt] = useState(null)
 
   const addDali = (text) =>
-    setMessages(prev => [...prev, { id: Date.now() + Math.random(), role: 'dali', text, time: nowStr() }])
+    setMessages(prev => [...prev, { id: Date.now() + Math.random(), role: 'dali', text, time: formatTime() }])
   const addUser = (text) =>
-    setMessages(prev => [...prev, { id: Date.now() + Math.random(), role: 'user', text, time: nowStr() }])
+    setMessages(prev => [...prev, { id: Date.now() + Math.random(), role: 'user', text, time: formatTime() }])
 
   // 첫 인사
   useEffect(() => {

@@ -88,3 +88,31 @@
 [data-theme="light"] .ob-date-divider::before,   [data-theme="light"] .ob-date-divider::after { background: rgba(var(--rgb-primary), 0.12); }
 [data-theme="light"] .chat-date-divider span,
 [data-theme="light"] .ob-date-divider span      { color: rgba(var(--rgb-primary), 0.42); }
+
+/* ── DM / NS 헤더 공통 (DataManagement + NotificationSettings) ── */
+.dm-header, .ns-header {
+  display: flex;
+  align-items: center;
+  padding: 8px 0 4px;
+}
+
+.dm-back, .ns-back {
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  font-size: 26px;
+  cursor: pointer;
+  padding: 4px 10px 4px 0;
+  line-height: 1;
+}
+
+.dm-title, .ns-title {
+  flex: 1;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+  text-align: center;
+  margin: 0;
+}
+
+.dm-header-end, .ns-header-end { width: 34px; }
