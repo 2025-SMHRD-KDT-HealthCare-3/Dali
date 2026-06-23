@@ -16,7 +16,17 @@ Date.prototype.toJSON = function () {
 
 const app = express();
 
-app.use(cors({ origin: process.env.FRONTEND_URL || '*', credentials: true }));
+// credentials:true(쿠키 인증)일 때 Access-Control-Allow-Origin은 '*'(와일드카드)를 쓸 수 없다.
+// env(FRONTEND_URL)를 못 읽어도 '*'로 떨어지지 않도록 기본값을 명시하고, 허용 origin만 반사해준다.
+// FRONTEND_URL은 콤마로 여러 개 지정 가능 (예: "http://localhost:5173,https://dali.example.com")
+const allowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:5173,http://127.0.0.1:5173')
+  .split(',')
+  .map((o) => o.trim());
+
+app.use(cors({
+  origin: (origin, cb) => cb(null, !origin || allowedOrigins.includes(origin)),
+  credentials: true,
+}));
 app.use(express.json());
 app.use(cookieParser());
 
