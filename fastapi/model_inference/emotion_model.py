@@ -1,5 +1,5 @@
 """
-fastapi/model_inference/emotion_model.py
+fastapi/services/emotion_model.py
 ==================================
 KcELECTRA v8 감정 추론 서비스
 
@@ -34,7 +34,6 @@ _MODEL_DIR = Path(__file__).parent.parent / "model" / "kcelectra"
 
 # 6감정 레이블. 학습 시 라벨 순서(EMOTION2ID)와 반드시 동일해야
 # 모델 출력 인덱스와 한글 라벨이 올바르게 매핑된다.
-# 의도적으로 emotions.py(공용 상수)를 import하지 않음
 EMOTIONS: list[str] = ["기쁨", "슬픔", "불안", "분노", "상처", "당황"]
 
 # 토큰 예산 — v8 학습 시 정한 고정값. 바꾸면 추론 정확도가 떨어진다.
@@ -85,7 +84,21 @@ def load_model() -> None:
         with open(temp_path, encoding="utf-8") as f:
             _T = float(json.load(f).get("temperature", 1.0))
 
+    _warmup()
+
     logger.info("emotion_model 로드 완료 | device=%s | T=%.4f", _device, _T)
+
+
+def _warmup() -> None:
+    """
+    첫 실제 요청이 CUDA 커널 선택/컴파일 등 첫 추론 오버헤드를
+    떠안지 않도록, 컨테이너 기동 시점에 더미 입력으로 미리 1회 추론한다.
+    (GPU 환경에서 효과가 크고, CPU 환경에서도 손해는 없음)
+    """
+    try:
+        predict_emotions("웜업용 더미 문장입니다.", prev_text="이전 발화 더미입니다.")
+    except Exception as e:
+        logger.warning("워밍업 추론 실패(치명적이지 않음): %s", e)
 
 
 def is_loaded() -> bool:

@@ -108,9 +108,13 @@ const Chat = () => {
   /* ── 첫 메시지 전송 여부 (빠른 선택지 숨김 트리거) ── */
   const [hasSentFirst, setHasSentFirst] = useState(false)
 
-  /* ── 텍스트 디바운스 ── */
+  /* ── 텍스트 입력 버퍼 / 유휴 플러시 ──
+     Enter로 줄을 버퍼에 모으고(화면엔 즉시 표시), 타이핑이 완전히
+     멈추면(유휴) 버퍼를 합쳐 AI를 한 번만 호출한다.                 */
   const [isUserTyping, setIsUserTyping] = useState(false)
-  const debounceRef                      = useRef(null)
+  const bufferRef                        = useRef([])    // Enter로 모은 발화 줄
+  const idleRef                          = useRef(null)  // 유휴 플러시 타이머
+  const IDLE_MS = 1500                                    // 멈춤 판정 시간
 
   /* ── 응답 대기 중 메시지 큐 ── */
   const pendingQueueRef = useRef([])
@@ -255,41 +259,60 @@ const Chat = () => {
     }
   }
 
-  const sendMessage = (text) => {
-    if (!text.trim() || isRisk) return
+  // 한 줄을 화면에 표시하고 버퍼에 적재 (AI 호출은 아직 안 함)
+  const commitLine = (text) => {
     const trimmed = text.trim()
+    if (!trimmed || isRisk) return false
     if (!hasSentFirst) setHasSentFirst(true)
     addUser(trimmed)
-    setInput('')
+    bufferRef.current.push(trimmed)
+    return true
+  }
 
-    // 달리가 응답 생성 중이면 큐에 쌓고 끝
+  // 버퍼를 합쳐 AI 호출 (응답 중이면 큐에 쌓아 끝나면 묶어 재전송)
+  const flushBuffer = () => {
+    clearTimeout(idleRef.current)
+    if (bufferRef.current.length === 0) return
+    const lines = [...bufferRef.current]
+    bufferRef.current = []
     if (isTypingRef.current) {
-      pendingQueueRef.current.push(trimmed)
+      pendingQueueRef.current.push(...lines)
       return
     }
-
-    sendBatch([trimmed])
+    sendBatch(lines)
   }
 
+  // Enter — 줄을 버퍼에 모으고 화면 표시, 멈춤 감지 타이머 재시작
+  const handleEnter = () => {
+    if (commitLine(input)) {
+      setInput('')
+      setIsUserTyping(false)
+    }
+    clearTimeout(idleRef.current)
+    idleRef.current = setTimeout(flushBuffer, IDLE_MS)
+  }
+
+  // 전송 버튼 / 빠른 선택지 — 현재 입력 + 버퍼를 즉시 합쳐 호출
   const handleSend = () => {
-    clearTimeout(debounceRef.current)
+    clearTimeout(idleRef.current)
+    commitLine(input)
+    setInput('')
     setIsUserTyping(false)
-    sendMessage(input)
+    flushBuffer()
   }
 
+  const sendNow = (text) => {
+    clearTimeout(idleRef.current)
+    commitLine(text)
+    flushBuffer()
+  }
+
+  // 입력 변경 — 타이핑 중엔 자동 전송 없음(시간제한 0), 대기 중 플러시는 취소
   const handleInputChange = (e) => {
     const val = e.target.value
     setInput(val)
     setIsUserTyping(val.trim().length > 0)
-
-    clearTimeout(debounceRef.current)
-    debounceRef.current = setTimeout(() => {
-      if (val.trim()) {
-        setIsUserTyping(false)
-        sendMessage(val.trim())
-        setInput('')
-      }
-    }, 1500)
+    clearTimeout(idleRef.current)
   }
 
   /* ── 음성 전송 ── */
@@ -469,7 +492,7 @@ const Chat = () => {
           </div>
           <div className="chat-emotion-chips">
             {currentQuickReplies.map((label) => (
-              <button key={label} className="chat-chip" onClick={() => sendMessage(label)}>
+              <button key={label} className="chat-chip" onClick={() => sendNow(label)}>
                 {label}
               </button>
             ))}
@@ -485,7 +508,7 @@ const Chat = () => {
           placeholder="메시지를 입력해 주세요..."
           value={input}
           onChange={handleInputChange}
-          onKeyDown={e => e.key === 'Enter' && handleSend()}
+          onKeyDown={e => e.key === 'Enter' && handleEnter()}
         />
         <button
           className={`chat-mic${isRecording ? ' chat-mic--recording' : ''}`}
