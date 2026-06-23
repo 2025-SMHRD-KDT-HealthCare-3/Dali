@@ -6,6 +6,7 @@
 
 const jwt = require('jsonwebtoken');
 const { ValidationError } = require('./errorHandler');
+const { isReplaced } = require('../utils/sessionStore');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret_key';
 
@@ -19,6 +20,10 @@ const requireLogin = (req, res, next) => {
 
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
+    // 다른 기기에서 새로 로그인해 세션이 교체되었으면 차단 (중복 로그인 방지)
+    if (isReplaced(decoded.user_id, decoded.sid)) {
+      return next(new ValidationError('다른 기기에서 로그인되어 로그아웃되었습니다.', 401, 'SESSION_REPLACED'));
+    }
     req.user = decoded;
     next();
   } catch {
@@ -27,6 +32,7 @@ const requireLogin = (req, res, next) => {
 };
 
 // 비회원도 허용 — 토큰 있으면 req.user 설정, 없으면 req.user = null로 통과
+// (세션이 교체된 토큰도 비회원으로 강등 처리)
 const optionalLogin = (req, res, next) => {
   const authHeader = req.headers.authorization;
   const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
@@ -37,7 +43,8 @@ const optionalLogin = (req, res, next) => {
   }
 
   try {
-    req.user = jwt.verify(token, JWT_SECRET);
+    const decoded = jwt.verify(token, JWT_SECRET);
+    req.user = isReplaced(decoded.user_id, decoded.sid) ? null : decoded;
     next();
   } catch {
     req.user = null;
