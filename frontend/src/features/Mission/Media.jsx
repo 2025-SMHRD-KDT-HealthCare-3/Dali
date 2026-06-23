@@ -9,7 +9,6 @@ import musicLight from '../../assets/light/음악달리라이트.png'
 import videoDark  from '../../assets/dark/영상달리다크.png'
 import videoLight from '../../assets/light/영상달리라이트.png'
 
-const MEDIA_BASE = '/api/media/'
 
 const fmt = (sec) => {
   const s = Math.floor(sec || 0)
@@ -88,8 +87,8 @@ const Media = ({ topEmotion }) => {
 
   const musicThumb = isDark ? musicDark  : musicLight
   const videoThumb = isDark ? videoDark  : videoLight
-  const musicSrc   = music?.file_url ? MEDIA_BASE + music.file_url : null
-  const videoSrc   = video?.file_url ? MEDIA_BASE + video.file_url : null
+  const musicSrc   = music?.file_url || null
+  const videoSrc   = video?.file_url || null
 
   return (
     <div className="media-section">
