@@ -383,9 +383,9 @@
   }
 
   .auth-banner-img {
-    max-height: 300px;
-    object-fit: cover;
-    object-position: center top;
+    width: 100%;
+    height: auto;
+    max-height: none;
   }
 
   .auth-content {
