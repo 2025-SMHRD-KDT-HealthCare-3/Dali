@@ -193,12 +193,14 @@ CREATE TABLE emotion_alerts (
 
 -- 테이블 생성 SQL - risk_events
 CREATE TABLE risk_events (
-    risk_id          INT         AUTO_INCREMENT PRIMARY KEY                               COMMENT '신호고유번호',
-    user_id          INT         NOT NULL                                                 COMMENT '회원고유번호',
-    session_id       INT         NOT NULL                                                 COMMENT '세션고유번호',
-    matched_category VARCHAR(20) NOT NULL                                                 COMMENT '감지분류',
-    action_taken     VARCHAR(50) NOT NULL CHECK (action_taken IN ('feedback', 'hotline')) COMMENT '처리결과',
-    detected_at      DATETIME    NOT NULL DEFAULT NOW()                                   COMMENT '감지일시',
+    risk_id                INT         AUTO_INCREMENT PRIMARY KEY                            COMMENT '신호고유번호',
+    user_id                INT         NOT NULL                                              COMMENT '회원고유번호',
+    session_id             INT         NOT NULL                                              COMMENT '세션고유번호',
+    risk_level             VARCHAR(10) NOT NULL CHECK (risk_level IN ('risk', 'critical'))   COMMENT '위험단계',
+    matched_category       VARCHAR(20) NOT NULL                                              COMMENT '감지분류',
+    judge_factors          JSON        NULL                                                  COMMENT '판단근거',
+    safety_mode_triggered  CHAR(1)     NOT NULL DEFAULT 'N' CHECK (safety_mode_triggered IN ('Y', 'N'))    COMMENT '안전모드발동여부',
+    detected_at            DATETIME    NOT NULL DEFAULT NOW()                                COMMENT '감지일시',
     
     -- Foreign Key 설정 - risk_events(user_id) -> users(user_id)
     CONSTRAINT fk_risk_events_users FOREIGN KEY (user_id) 
