@@ -484,52 +484,6 @@
   display: block;
 }
 
-/* 주간 세로 막대 */
-.rp-weekly {
-  display: flex;
-  align-items: flex-end;
-  gap: 10px;
-  height: 120px;
-}
-
-.rp-weekly-col {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  height: 100%;
-}
-
-.rp-weekly-score {
-  font-size: var(--fs-sub);
-  font-weight: var(--fw-bold);
-  color: var(--color-primary-soft);
-}
-
-.rp-weekly-track {
-  flex: 1;
-  width: 100%;
-  background: rgba(var(--rgb-white), 0.08);
-  border-radius: 8px;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-}
-
-.rp-weekly-fill {
-  width: 100%;
-  border-radius: 8px;
-  background: linear-gradient(180deg, var(--color-purple-accent) 0%, var(--color-purple-glow) 100%);
-  transition: height 0.5s cubic-bezier(0.34, 1.2, 0.64, 1);
-}
-
-.rp-weekly-label {
-  font-size: var(--fs-sub);
-  color: rgba(var(--rgb-white), 0.42);
-  font-weight: var(--fw-medium);
-}
 
 /* ═══════════════════════════════════════════
    감정 주의 신호 이력
@@ -748,9 +702,6 @@
   border-color: rgba(var(--rgb-primary), 0.1);
 }
 [data-theme="light"] .rp-data-title    { color: var(--color-primary); }
-[data-theme="light"] .rp-weekly-track  { background: rgba(var(--rgb-primary), 0.07); }
-[data-theme="light"] .rp-weekly-score  { color: var(--color-purple-accent); }
-[data-theme="light"] .rp-weekly-label  { color: rgba(var(--rgb-primary), 0.42); }
 
 [data-theme="light"] .rp-alert-card {
   background: rgba(var(--rgb-error), 0.05);

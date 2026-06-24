@@ -250,17 +250,6 @@ const Report = () => {
     return data
   }, [monthlyData, currentMonth])
 
-  /* 주차별 세션 수 — Node의 weekly_sessions 사용 */
-  const weeklyTrends = useMemo(() => {
-    if (!monthlyData?.weekly_sessions) return []
-    const maxCount = Math.max(...monthlyData.weekly_sessions.map(w => w.count), 1)
-    return monthlyData.weekly_sessions.map(({ week, count }) => ({
-      week: `${week}주`,
-      score: Math.round(count / maxCount * 100),
-      count,
-    }))
-  }, [monthlyData])
-
   const hasTrendData = (monthlyData?.summary?.total_sessions || 0) > 0
 
   /* ── 렌더 ── */
@@ -529,24 +518,6 @@ const Report = () => {
                         <span key={label} className="rp-legend-item">
                           <span className="rp-dot" style={{ background: EMOTIONS[label]?.color }} />{label}
                         </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* 주차별 세션 흐름 */}
-                {hasTrendData && (
-                  <div className="rp-data-card">
-                    <h3 className="rp-data-title">주차별 대화 횟수</h3>
-                    <div className="rp-weekly">
-                      {weeklyTrends.map(({ week, score, count }) => (
-                        <div key={week} className="rp-weekly-col">
-                          <span className="rp-weekly-score">{count}</span>
-                          <div className="rp-weekly-track">
-                            <div className="rp-weekly-fill" style={{ height: `${score}%` }} />
-                          </div>
-                          <span className="rp-weekly-label">{week}</span>
-                        </div>
                       ))}
                     </div>
                   </div>
