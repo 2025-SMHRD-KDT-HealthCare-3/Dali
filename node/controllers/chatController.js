@@ -127,30 +127,31 @@ async function chatRespond(req, res) {
   if (!utterance) {
     return res.status(400).json({ code: 'INVALID_REQUEST', message: 'utterance를 입력해주세요.' });
   }
-  if (!session_id) {
-    return res.status(400).json({ code: 'INVALID_REQUEST', message: 'session_id를 입력해주세요.' });
-  }
 
-  // FastAPI에 전달할 데이터 병렬 조회
+  // 회원 + 세션이 있을 때만 FastAPI 페이로드용 데이터 조회 (비회원은 DB 없이 LLM 응답만)
   // - messages   : 이전 대화 내역 (history 구성용)
   // - user        : 페르소나 조회
   // - session     : 선택 감정 조회
   // - alerts      : 미확인 감정 주의 신호 (alert_context)
   // - summaries   : 최근 대화 요약 1-2개 (recent_summaries)
-  const [messages, user, session, alerts, summaries, onboarding, prior_risk_count, is_in_safety_mode] = await Promise.all([
-    sessionRepo.findMessagesBySession(session_id),
-    userRepo.findById(req.user.user_id),
-    sessionRepo.findSessionById(session_id),
-    emotionAlertRepo.findUnconfirmedByUserId(req.user.user_id),
-    summaryRepo.findRecentByUserId(req.user.user_id, 2),
-    onboardingRepo.findAllByUser(req.user.user_id),  // q3(신경 쓰이는 영역) 조회용
-    riskEventRepo.countRiskInSession(session_id),     // FastAPI prior_risk_count
-    riskEventRepo.hasSafetyModeTriggered(session_id), // FastAPI is_in_safety_mode
-  ]);
+  let messages = [], user = null, session = null, alerts = [], summaries = [], onboarding = [];
+  let prior_risk_count = 0, is_in_safety_mode = false;  // 비회원/세션 없음 시 기본값
+  if (req.user && session_id) {
+    [messages, user, session, alerts, summaries, onboarding, prior_risk_count, is_in_safety_mode] = await Promise.all([
+      sessionRepo.findMessagesBySession(session_id),
+      userRepo.findById(req.user.user_id),
+      sessionRepo.findSessionById(session_id),
+      emotionAlertRepo.findUnconfirmedByUserId(req.user.user_id),
+      summaryRepo.findRecentByUserId(req.user.user_id, 2),
+      onboardingRepo.findAllByUser(req.user.user_id),  // q3(신경 쓰이는 영역) 조회용
+      riskEventRepo.countRiskInSession(session_id),     // FastAPI prior_risk_count
+      riskEventRepo.hasSafetyModeTriggered(session_id), // FastAPI is_in_safety_mode
+    ]);
 
-  // 세션 존재 여부 + 소유자 검증 (IDOR 방어)
-  if (!session || session.user_id !== req.user.user_id) {
-    return res.status(403).json({ code: 'FORBIDDEN', message: '접근 권한이 없습니다.' });
+    // 세션 존재 여부 + 소유자 검증 (IDOR 방어)
+    if (!session || session.user_id !== req.user.user_id) {
+      return res.status(403).json({ code: 'FORBIDDEN', message: '접근 권한이 없습니다.' });
+    }
   }
 
   // 1차 키워드 감지 (Node) → has_risk_keyword로 FastAPI에 전달 → risk_gate가 GPT로 2차 문맥 판단
@@ -164,16 +165,19 @@ async function chatRespond(req, res) {
     fastapiRes = await axios.post(
       `${process.env.FASTAPI_URL}/internal/chat`,
       {
-        session_id,
-        user_id:              req.user.user_id,
+        session_id:           session_id || null,
+        user_id:              req.user?.user_id || null,
         utterance,
         has_risk_keyword:     hasRiskKeyword,
         // persona는 FastAPI 스키마상 str(필수, null 불가)
         // 회원: DB users.persona / 비회원: req.body.persona(프론트 게스트 온보딩값) / 둘 다 없으면 명세 기본값 '공감형'
         persona:              user?.persona || req.body.persona || '공감형',
         selected_emotion:     session?.selected_emotion || null,
-        // history: role/content 형식으로 변환해서 전달
-        history:              messages.map(m => ({ role: m.role, content: m.content })),
+        // history: 회원은 DB 발화내역(role/content 변환), 비회원은 프론트가 보낸 브라우저 보관분으로 대화 맥락 유지
+        // (비회원은 DB 세션이 없어 messages가 비므로 req.body.history를 그대로 전달 — 형식은 [{role, content}])
+        history:              (req.user && session_id)
+                                ? messages.map(m => ({ role: m.role, content: m.content }))
+                                : (Array.isArray(req.body.history) ? req.body.history : []),
         // current_emotion_analysis: 직전 발화의 감정분석(chat_analyses 최근 1건) — LLM 프롬프트 참고용
         current_emotion_analysis: buildEmotionAnalysis(messages),
         alert_context:        alerts.slice(0, 2).map(a => ({
@@ -199,44 +203,46 @@ async function chatRespond(req, res) {
   const { reply, risk_level, matched_category, judge_factors, safety_mode_triggered, should_block_chat, show_hotline,
           joy_score, sad_score, anxiety_score, anger_score, hurt_score, embarrass_score } = fastapiRes.data;
 
-  // FastAPI 응답 후 DB 저장 — 위기 여부와 관계없이 동일하게 저장
-  // 사용자 발화를 먼저 저장해 log_id를 확보한 뒤, 그 log_id로 감정점수를 연결
-  const [[{ turn_idx }]] = await pool.query(
-    'SELECT COALESCE(MAX(turn_idx), 0) + 1 AS turn_idx FROM chat_logs WHERE session_id = ?',
-    [session_id]
-  );
-
-  // 사용자 발화 저장 — req.body에서 온 데이터이므로 speaker는 항상 'user'
-  const [userLogResult] = await pool.query(
-    'INSERT INTO chat_logs (user_id, session_id, speaker, utterance, turn_idx) VALUES (?, ?, ?, ?, ?)',
-    [req.user.user_id, session_id, 'user', utterance, turn_idx]
-  );
-
-  // 감정점수 저장 — FastAPI가 개별 필드로 반환 (위기/일반 모두 포함)
-  await pool.query(
-    'INSERT INTO chat_analyses (user_id, log_id, joy_score, sad_score, anxiety_score, anger_score, hurt_score, embarrass_score) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-    [req.user.user_id, userLogResult.insertId, joy_score ?? 0, sad_score ?? 0, anxiety_score ?? 0, anger_score ?? 0, hurt_score ?? 0, embarrass_score ?? 0]
-  );
-
-  // AI 답변 저장 — 위기/일반 모두 reply 필드 사용
-  if (reply) {
-    const [[{ ai_turn_idx }]] = await pool.query(
-      'SELECT COALESCE(MAX(turn_idx), 0) + 1 AS ai_turn_idx FROM chat_logs WHERE session_id = ?',
+  // 회원 + 세션이 있을 때만 DB 저장 — 위기 여부와 관계없이 동일하게 저장 (비회원은 저장 안 함)
+  if (req.user && session_id) {
+    // 사용자 발화를 먼저 저장해 log_id를 확보한 뒤, 그 log_id로 감정점수를 연결
+    const [[{ turn_idx }]] = await pool.query(
+      'SELECT COALESCE(MAX(turn_idx), 0) + 1 AS turn_idx FROM chat_logs WHERE session_id = ?',
       [session_id]
     );
-    await pool.query(
-      'INSERT INTO chat_logs (user_id, session_id, speaker, utterance, turn_idx) VALUES (?, ?, ?, ?, ?)',
-      [req.user.user_id, session_id, 'assistant', reply, ai_turn_idx]
-    );
-  }
 
-  // risk/critical이면 risk_events 저장, should_block_chat이면 세션 종료(안전모드 전환)
-  await saveRiskEventIfNeeded({
-    user_id: req.user.user_id,
-    session_id, risk_level, matched_category, judge_factors, safety_mode_triggered,
-  });
-  if (should_block_chat) {
-    await sessionRepo.endSession(session_id);
+    // 사용자 발화 저장 — req.body에서 온 데이터이므로 speaker는 항상 'user'
+    const [userLogResult] = await pool.query(
+      'INSERT INTO chat_logs (user_id, session_id, speaker, utterance, turn_idx) VALUES (?, ?, ?, ?, ?)',
+      [req.user.user_id, session_id, 'user', utterance, turn_idx]
+    );
+
+    // 감정점수 저장 — FastAPI가 개별 필드로 반환 (위기/일반 모두 포함)
+    await pool.query(
+      'INSERT INTO chat_analyses (user_id, log_id, joy_score, sad_score, anxiety_score, anger_score, hurt_score, embarrass_score) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [req.user.user_id, userLogResult.insertId, joy_score ?? 0, sad_score ?? 0, anxiety_score ?? 0, anger_score ?? 0, hurt_score ?? 0, embarrass_score ?? 0]
+    );
+
+    // AI 답변 저장 — 위기/일반 모두 reply 필드 사용
+    if (reply) {
+      const [[{ ai_turn_idx }]] = await pool.query(
+        'SELECT COALESCE(MAX(turn_idx), 0) + 1 AS ai_turn_idx FROM chat_logs WHERE session_id = ?',
+        [session_id]
+      );
+      await pool.query(
+        'INSERT INTO chat_logs (user_id, session_id, speaker, utterance, turn_idx) VALUES (?, ?, ?, ?, ?)',
+        [req.user.user_id, session_id, 'assistant', reply, ai_turn_idx]
+      );
+    }
+
+    // risk/critical이면 risk_events 저장, should_block_chat이면 세션 종료(안전모드 전환)
+    await saveRiskEventIfNeeded({
+      user_id: req.user.user_id,
+      session_id, risk_level, matched_category, judge_factors, safety_mode_triggered,
+    });
+    if (should_block_chat) {
+      await sessionRepo.endSession(session_id);
+    }
   }
 
   return res.json({ reply, risk_level, should_block_chat, show_hotline });
@@ -320,7 +326,10 @@ async function chatAudio(req, res) {
         // 회원: DB users.persona / 비회원: req.body.persona(프론트 게스트 온보딩값) / 둘 다 없으면 명세 기본값 '공감형'
         persona:              user?.persona || req.body.persona || '공감형',
         selected_emotion:     session?.selected_emotion || null,
-        history:              messages.map(m => ({ role: m.role, content: m.content })),
+        // history: 회원은 DB 발화내역, 비회원은 프론트가 보낸 브라우저 보관분으로 대화 맥락 유지 (형식 [{role, content}])
+        history:              (req.user && session_id)
+                                ? messages.map(m => ({ role: m.role, content: m.content }))
+                                : (Array.isArray(req.body.history) ? req.body.history : []),
         current_emotion_analysis: buildEmotionAnalysis(messages),
         alert_context:        alerts.slice(0, 2).map(a => ({
           alert_detected: true,
