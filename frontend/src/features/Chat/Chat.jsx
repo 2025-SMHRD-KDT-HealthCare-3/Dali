@@ -108,6 +108,7 @@ const Chat = () => {
   /* ── 응답 대기 중 메시지 큐 ── */
   const pendingQueueRef = useRef([])
   const isTypingRef     = useRef(false)
+  const messagesRef     = useRef([])
 
   /* ── 음성 녹음 ── */
   const [isRecording, setIsRecording]   = useState(false)
@@ -199,6 +200,9 @@ const Chat = () => {
   const [input,    setInput]    = useState('')
   const [isRisk,   setIsRisk]   = useState(false)
 
+  // messagesRef 동기화 — sendBatch 파라미터 이름 충돌 회피용
+  useEffect(() => { messagesRef.current = messages }, [messages])
+
   // sessionStorage 동기화 — sessionId·messages·greetingType·alertContext 저장
   useEffect(() => {
     if (!sessionId) return
@@ -254,6 +258,10 @@ const Chat = () => {
       if (!isAuthenticated) {
         const guest = JSON.parse(sessionStorage.getItem('dali_guest_profile') || '{}')
         if (guest.persona) body.persona = guest.persona
+        body.history = messagesRef.current
+          .filter(m => m.role === 'user' || m.role === 'dali')
+          .slice(-12)
+          .map(m => ({ role: m.role === 'dali' ? 'assistant' : 'user', content: m.text }))
       }
 
       const res = await chatApi.sendMessage(body)
