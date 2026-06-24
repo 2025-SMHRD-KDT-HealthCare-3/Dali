@@ -34,7 +34,8 @@
  *
  * [챗봇]
  * - POST   /api/chat/respond                      텍스트 발화 전송 → FastAPI 호출 → AI 응답 생성 (디바운스 후 프론트에서 합쳐서 전송)
- * - POST   /api/chat/audio                        음성 파일 → STT 변환 → AI 응답 생성
+ * - POST   /api/chat/audio/stt                    음성 파일 → 텍스트 변환만 (DB 저장 없음, 프론트 1단계)
+ * - POST   /api/chat/audio                        (레거시) 음성 파일 → STT → AI 응답 생성
  *
  * [발화별 감정 분석]
  * - GET    /api/log-analyses?session_id=X         세션의 발화별 분석 목록
@@ -127,8 +128,11 @@ router.get('/sessions/:id/messages', requireLogin, sessionCtrl.getSessionMessage
 
 // 챗봇 대화
 // /chat/respond: 프론트에서 디바운스 후 합쳐서 전송 → FastAPI 호출 → 응답 후 DB 저장
-// /chat/audio: 음성은 녹음 종료가 곧 발화의 끝이므로 STT 완료 즉시 FastAPI 호출
+// /chat/audio/stt: 음성 → 텍스트만 반환(DB 저장 없음). 프론트가 1단계로 호출 후 텍스트를 /chat/respond로 전송
+//   → 음성 입력의 FastAPI 2회 직렬 호출(STT+챗봇) 지연 개선. /chat/audio 보다 위에 둘 것
+// /chat/audio: (레거시) STT+챗봇 통합. 프론트 미사용 — 호환 위해 유지
 router.post('/chat/respond', requireLogin, chatCtrl.chatRespond);
+router.post('/chat/audio/stt', optionalLogin, chatCtrl.upload.single('audio'), chatCtrl.chatStt);
 router.post('/chat/audio', optionalLogin, chatCtrl.upload.single('audio'), chatCtrl.chatAudio);
 
 // 발화별 감정 분석
