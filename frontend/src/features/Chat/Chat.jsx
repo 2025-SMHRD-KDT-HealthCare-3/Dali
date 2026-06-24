@@ -237,7 +237,7 @@ const Chat = () => {
 
       const res = await chatApi.sendMessage(body)
 
-      if (res.is_risk) {
+      if (res.should_block_chat) {
         setIsRisk(true)
         setSessionId(null)
         sessionIdRef.current = null

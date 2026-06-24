@@ -8,7 +8,7 @@ const riskEventRepo = require('../repositories/riskEventRepository');
 const sessionRepo = require('../repositories/sessionRepository');
 
 // 고위험 신호 목록 조회
-// chatController에서 FastAPI가 is_crisis: true 반환 시 자동 저장됨
+// chatController에서 FastAPI 응답의 risk_level이 risk/critical일 때 자동 저장됨
 async function getRiskEvents(req, res) {
   const { session_id } = req.query;
 

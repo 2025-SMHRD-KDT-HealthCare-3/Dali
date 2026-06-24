@@ -12,14 +12,16 @@
  * 녹음 종료 시점이 이미 발화의 끝 → 디바운스 불필요 → STT 완료 즉시 FastAPI 호출
  *
  * [FastAPI 응답 형식]
- * { reply, risk: { detected, risk_level, matched_category }, joy_score, sad_score, ... }
- * - risk.detected: true → 위기 감지 (reply에 안전 응답 포함)
- * - risk.detected: false → 일반 응답 (reply에 LLM 응답 포함)
- * - 감정점수는 위기/일반 모두 개별 필드로 반환
+ * { reply, risk_level, matched_category, judge_factors, safety_mode_triggered,
+ *   should_block_chat, show_hotline, joy_score, sad_score, ... }
+ * - risk_level: none|watch|risk|critical|safety_mode_active
+ * - risk/critical → risk_events 저장 / should_block_chat=true → 세션 종료(안전모드 전환)
+ * - 감정점수는 모든 경우 개별 필드로 반환
  *
  * [위기 감지 처리]
- * Node 1차 키워드 감지 → FastAPI LLM 최종 판단 (risk.detected)
- * 세션 내 누적 1~2회 → feedback / 3회 → hotline(1577-0199) + 세션 종료
+ * Node 1차 키워드 감지 → FastAPI 2차 LLM 판단(risk_level) + 서비스 상태 계산
+ * Node는 호출 전 prior_risk_count/is_in_safety_mode를 전달하고, 응답의 risk_level이
+ * risk/critical이면 risk_events에 저장, should_block_chat이면 세션을 종료한다.
  */
 
 const axios = require('axios');
@@ -76,34 +78,23 @@ function getQ3Answer(onboarding) {
 }
 
 
-// 위기 이벤트 저장 + 3회 시 세션 종료 — 응답은 호출부에서 처리
-async function saveRiskEvent({ user_id, session_id, matched_category }) {
-  const prevCount = await riskEventRepo.countBySessionId(session_id, user_id);
-  const totalCount = prevCount + 1;
-  const action = totalCount === 3 ? 'hotline' : 'feedback';
-  await riskEventRepo.createRiskEvent({ user_id, session_id, matched_category, action_taken: action });
-  if (action === 'hotline' && session_id) await sessionRepo.endSession(session_id);
-  return action;
-}
-
 /*
- * handleRisk - 고위험 신호 감지 시 공통 처리 (저장 + 응답)
- * - 1~2회: 세션 유지, feedback 응답
- * - 3회: 세션 종료, hotline 응답
- * - response_text: LLM이 생성한 응답 텍스트 (없으면 null)
+ * saveRiskEventIfNeeded - FastAPI 응답의 risk_level이 risk/critical이면 risk_events에 저장
+ * - judge_factors: FastAPI가 risk/critical일 때만 객체로 반환 → JSON 문자열로 변환해 저장
+ * - safety_mode_triggered: 이 이벤트가 안전모드를 처음 발동시켰는지 → 'Y'/'N'
  */
-async function handleRisk({ user_id, session_id, matched_category, response_text, res }) {
-  const action = await saveRiskEvent({ user_id, session_id, matched_category });
-
-  if (action === 'hotline') {
-    return res.json({
-      is_risk: true,
-      action: 'hotline',
-      reply: response_text,
-      hotline: { name: '정신건강 위기상담 전화', phone: '1577-0199' },
-    });
-  }
-  return res.json({ is_risk: true, action: 'feedback', reply: response_text });
+async function saveRiskEventIfNeeded({ user_id, session_id, risk_level, matched_category, judge_factors, safety_mode_triggered }) {
+  if (risk_level !== 'risk' && risk_level !== 'critical') return;
+  await riskEventRepo.createRiskEvent({
+    user_id,
+    session_id,
+    risk_level,
+    // matched_category가 NOT NULL이라 None 방어 — risk_gate 체계의 'unknown'으로 폴백
+    // (정상 흐름에선 risk/critical 시 FastAPI가 suicide/self_harm/violence 등을 반환)
+    matched_category: matched_category || 'unknown',
+    judge_factors: judge_factors ? JSON.stringify(judge_factors) : null,
+    safety_mode_triggered: safety_mode_triggered ? 'Y' : 'N',
+  });
 }
 
 /*
@@ -146,13 +137,15 @@ async function chatRespond(req, res) {
   // - session     : 선택 감정 조회
   // - alerts      : 미확인 감정 주의 신호 (alert_context)
   // - summaries   : 최근 대화 요약 1-2개 (recent_summaries)
-  const [messages, user, session, alerts, summaries, onboarding] = await Promise.all([
+  const [messages, user, session, alerts, summaries, onboarding, prior_risk_count, is_in_safety_mode] = await Promise.all([
     sessionRepo.findMessagesBySession(session_id),
     userRepo.findById(req.user.user_id),
     sessionRepo.findSessionById(session_id),
     emotionAlertRepo.findUnconfirmedByUserId(req.user.user_id),
     summaryRepo.findRecentByUserId(req.user.user_id, 2),
     onboardingRepo.findAllByUser(req.user.user_id),  // q3(신경 쓰이는 영역) 조회용
+    riskEventRepo.countRiskInSession(session_id),     // FastAPI prior_risk_count
+    riskEventRepo.hasSafetyModeTriggered(session_id), // FastAPI is_in_safety_mode
   ]);
 
   // 세션 존재 여부 + 소유자 검증 (IDOR 방어)
@@ -160,8 +153,8 @@ async function chatRespond(req, res) {
     return res.status(403).json({ code: 'FORBIDDEN', message: '접근 권한이 없습니다.' });
   }
 
-  // 1차 키워드 감지 (Node) → has_risk_keyword로 FastAPI에 전달 → risk_gate가 2차 LLM 문맥 판단
-  // true면 FastAPI가 자체 스캔 생략하고 바로 LLM 판단 / false여도 FastAPI가 자체 목록으로 폴백 스캔
+  // 1차 키워드 감지 (Node) → has_risk_keyword로 FastAPI에 전달 → risk_gate가 GPT로 2차 문맥 판단
+  // true면 FastAPI가 moderation 호출 생략(이미 감지) / false면 omni-moderation으로 의미 기반 재탐지
   // 공백 제거 후 매칭 — "죽고 싶어" → "죽고싶어" 로 정규화해서 띄어쓰기 변형 대응
   const normalized = utterance.replace(/\s/g, '');
   const hasRiskKeyword = RISK_KEYWORDS.some(keyword => normalized.includes(keyword));
@@ -175,8 +168,9 @@ async function chatRespond(req, res) {
         user_id:              req.user.user_id,
         utterance,
         has_risk_keyword:     hasRiskKeyword,
-        // persona는 FastAPI 스키마상 str(필수, null 불가) → 미설정 시 명세 기본값 '공감형' 전달
-        persona:              user?.persona || '공감형',
+        // persona는 FastAPI 스키마상 str(필수, null 불가)
+        // 회원: DB users.persona / 비회원: req.body.persona(프론트 게스트 온보딩값) / 둘 다 없으면 명세 기본값 '공감형'
+        persona:              user?.persona || req.body.persona || '공감형',
         selected_emotion:     session?.selected_emotion || null,
         // history: role/content 형식으로 변환해서 전달
         history:              messages.map(m => ({ role: m.role, content: m.content })),
@@ -192,18 +186,18 @@ async function chatRespond(req, res) {
         recent_summaries:     summaries.map(s => s.context_summary),
         // q3_answer: 온보딩 3번(신경 쓰이는 영역) 답변 — LLM 대화 맥락 보강용
         q3_answer:            getQ3Answer(onboarding),
+        // 위험 감지 서비스 상태 — risk_events 조회 결과 (FastAPI가 안전모드 누적 판정에 사용)
+        prior_risk_count,
+        is_in_safety_mode,
       },
       { headers: { 'X-Internal-API-Key': process.env.INTERNAL_API_KEY } }
     );
   } catch {
-    // 키워드 감지 상태에서 LLM 통신 장애 → 카운트만 올리고 오류 반환
-    if (hasRiskKeyword && session_id) {
-      await saveRiskEvent({ user_id: req.user.user_id, session_id, matched_category: '통신오류' });
-    }
     return res.status(502).json({ code: 'BAD_GATEWAY', message: 'AI 응답에 실패했습니다. 잠시 후 다시 시도해주세요.' });
   }
 
-  const { reply, risk, joy_score, sad_score, anxiety_score, anger_score, hurt_score, embarrass_score } = fastapiRes.data;
+  const { reply, risk_level, matched_category, judge_factors, safety_mode_triggered, should_block_chat, show_hotline,
+          joy_score, sad_score, anxiety_score, anger_score, hurt_score, embarrass_score } = fastapiRes.data;
 
   // FastAPI 응답 후 DB 저장 — 위기 여부와 관계없이 동일하게 저장
   // 사용자 발화를 먼저 저장해 log_id를 확보한 뒤, 그 log_id로 감정점수를 연결
@@ -236,18 +230,16 @@ async function chatRespond(req, res) {
     );
   }
 
-  // FastAPI가 위기 감지 시 위기 처리 (DB 저장 후 호출)
-  if (risk?.detected) {
-    return handleRisk({
-      user_id: req.user.user_id,
-      session_id,
-      matched_category: risk.matched_category || '위기감지',
-      response_text: reply,
-      res,
-    });
+  // risk/critical이면 risk_events 저장, should_block_chat이면 세션 종료(안전모드 전환)
+  await saveRiskEventIfNeeded({
+    user_id: req.user.user_id,
+    session_id, risk_level, matched_category, judge_factors, safety_mode_triggered,
+  });
+  if (should_block_chat) {
+    await sessionRepo.endSession(session_id);
   }
 
-  return res.json({ reply, is_risk: false });
+  return res.json({ reply, risk_level, should_block_chat, show_hotline });
 }
 
 /*
@@ -293,14 +285,17 @@ async function chatAudio(req, res) {
 
   // 회원 + 세션이 있을 때만 FastAPI 페이로드용 데이터 조회
   let messages = [], user = null, session = null, alerts = [], summaries = [], onboarding = [];
+  let prior_risk_count = 0, is_in_safety_mode = false;  // 비회원/세션 없음 시 기본값
   if (req.user && session_id) {
-    [messages, user, session, alerts, summaries, onboarding] = await Promise.all([
+    [messages, user, session, alerts, summaries, onboarding, prior_risk_count, is_in_safety_mode] = await Promise.all([
       sessionRepo.findMessagesBySession(session_id),
       userRepo.findById(req.user.user_id),
       sessionRepo.findSessionById(session_id),
       emotionAlertRepo.findUnconfirmedByUserId(req.user.user_id),
       summaryRepo.findRecentByUserId(req.user.user_id, 2),
       onboardingRepo.findAllByUser(req.user.user_id),  // q3(신경 쓰이는 영역) 조회용
+      riskEventRepo.countRiskInSession(session_id),     // FastAPI prior_risk_count
+      riskEventRepo.hasSafetyModeTriggered(session_id), // FastAPI is_in_safety_mode
     ]);
 
     // 세션 존재 여부 + 소유자 검증 (IDOR 방어)
@@ -321,8 +316,9 @@ async function chatAudio(req, res) {
         user_id:              req.user?.user_id || null,
         utterance,
         has_risk_keyword:     hasRiskKeyword,
-        // persona는 FastAPI 스키마상 str(필수, null 불가) → 미설정 시 명세 기본값 '공감형' 전달
-        persona:              user?.persona || '공감형',
+        // persona는 FastAPI 스키마상 str(필수, null 불가)
+        // 회원: DB users.persona / 비회원: req.body.persona(프론트 게스트 온보딩값) / 둘 다 없으면 명세 기본값 '공감형'
+        persona:              user?.persona || req.body.persona || '공감형',
         selected_emotion:     session?.selected_emotion || null,
         history:              messages.map(m => ({ role: m.role, content: m.content })),
         current_emotion_analysis: buildEmotionAnalysis(messages),
@@ -336,18 +332,18 @@ async function chatAudio(req, res) {
         recent_summaries:     summaries.map(s => s.context_summary),
         // q3_answer: 온보딩 3번(신경 쓰이는 영역) 답변 — 비회원은 온보딩 미저장이라 null
         q3_answer:            getQ3Answer(onboarding),
+        // 위험 감지 서비스 상태 — risk_events 조회 결과 (비회원/세션 없음은 0/false)
+        prior_risk_count,
+        is_in_safety_mode,
       },
       { headers: { 'X-Internal-API-Key': process.env.INTERNAL_API_KEY } }
     );
   } catch {
-    // 키워드 감지 상태에서 LLM 통신 장애 → 카운트만 올리고 오류 반환
-    if (hasRiskKeyword && req.user && session_id) {
-      await saveRiskEvent({ user_id: req.user.user_id, session_id, matched_category: '통신오류' });
-    }
     return res.status(502).json({ code: 'BAD_GATEWAY', message: 'AI 응답에 실패했습니다. 잠시 후 다시 시도해주세요.' });
   }
 
-  const { reply, risk, joy_score, sad_score, anxiety_score, anger_score, hurt_score, embarrass_score } = fastapiRes.data;
+  const { reply, risk_level, matched_category, judge_factors, safety_mode_triggered, should_block_chat, show_hotline,
+          joy_score, sad_score, anxiety_score, anger_score, hurt_score, embarrass_score } = fastapiRes.data;
 
   // 회원 + 세션이 있을 때만 DB 저장 — 위기 여부와 관계없이 동일하게 저장
   if (req.user && session_id) {
@@ -381,18 +377,46 @@ async function chatAudio(req, res) {
     }
   }
 
-  // FastAPI가 위기 감지 시 위기 처리 (DB 저장 후 호출)
-  if (req.user && session_id && risk?.detected) {
-    return handleRisk({
+  // 회원 + 세션 있을 때만 위기 저장/세션 종료 (비회원은 risk_events 저장 대상 아님)
+  if (req.user && session_id) {
+    await saveRiskEventIfNeeded({
       user_id: req.user.user_id,
-      session_id,
-      matched_category: risk.matched_category || '위기감지',
-      response_text: reply,
-      res,
+      session_id, risk_level, matched_category, judge_factors, safety_mode_triggered,
     });
+    if (should_block_chat) {
+      await sessionRepo.endSession(session_id);
+    }
   }
 
-  return res.json({ reply, utterance, is_risk: false });
+  return res.json({ reply, utterance, risk_level, should_block_chat, show_hotline });
 }
 
-module.exports = { chatRespond, chatAudio, upload };
+/*
+ * chatStt - 음성 → 텍스트 변환만 수행 (POST /api/chat/audio/stt)
+ *
+ * 음성 입력 응답 지연 개선: 기존 chatAudio는 STT + 챗봇을 한 요청에서 직렬로 처리(FastAPI 2회 호출)해
+ * 느렸음. 프론트가 ① 이 엔드포인트로 텍스트를 먼저 받아 화면에 표시하고, ② 그 텍스트를
+ * /chat/respond로 보내 답변을 받는 2단계로 분리 → 체감 지연 감소.
+ * STT만 담당하며 DB 저장은 하지 않는다.
+ */
+async function chatStt(req, res) {
+  if (!req.file) {
+    return res.status(400).json({ code: 'INVALID_REQUEST', message: '음성 파일을 첨부해주세요.' });
+  }
+
+  const form = new FormData();
+  form.append('audio', req.file.buffer, { filename: req.file.originalname, contentType: req.file.mimetype });
+
+  try {
+    const sttRes = await axios.post(
+      `${process.env.FASTAPI_URL}/internal/stt`,
+      form,
+      { headers: { ...form.getHeaders(), 'X-Internal-API-Key': process.env.INTERNAL_API_KEY } }
+    );
+    return res.json({ utterance: sttRes.data.text || '' });
+  } catch {
+    return res.status(502).json({ code: 'BAD_GATEWAY', message: 'STT 변환에 실패했습니다.' });
+  }
+}
+
+module.exports = { chatRespond, chatAudio, chatStt, upload };
