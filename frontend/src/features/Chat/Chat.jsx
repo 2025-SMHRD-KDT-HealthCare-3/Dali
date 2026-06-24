@@ -66,7 +66,6 @@ const MicIcon = () => (
   </svg>
 )
 
-const STORAGE_KEY = 'dali_chat_session'
 
 const Chat = () => {
   const navigate  = useNavigate()
@@ -175,23 +174,40 @@ const Chat = () => {
     // 온보딩 미완료 회원은 Effect 1이 /onboarding으로 이동시키므로 여기서 중단
     if (user && !user.onboarding_completed) return
 
-    // 회원: sessionStorage 복원 or 신규 세션 시작
-    const saved = sessionStorage.getItem(STORAGE_KEY)
-    if (saved) {
+    // 회원: DB에서 오늘 활성 세션 복원 or 신규 세션 시작
+    const restoreOrStart = async () => {
       try {
-        const parsed = JSON.parse(saved)
-        if (parsed.sessionId) {
-          setSessionId(parsed.sessionId)
-          sessionIdRef.current = parsed.sessionId
-          if (parsed.messages?.length) setMessages(parsed.messages)
-          if (parsed.greetingType)     setGreetingType(parsed.greetingType)
-          if (parsed.alertContext)     setAlertContext(parsed.alertContext)
-          setHasSentFirst(true)
+        const { sessions } = await sessionApi.getLatestSession()
+        const latest = sessions?.[0]
+        const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Seoul' })
+        const isToday  = latest?.created_at?.slice(0, 10) === todayStr
+        const isActive = !latest?.ended_at
+
+        if (latest && isToday && isActive) {
+          // 오늘 진행 중인 세션 복원
+          setSessionId(latest.session_id)
+          sessionIdRef.current = latest.session_id
+          const { messages: dbMessages } = await sessionApi.getMessages(latest.session_id)
+          if (dbMessages?.length) {
+            setMessages(dbMessages.map(m => ({
+              id:   m.log_id,
+              role: m.role === 'assistant' ? 'dali' : 'user',
+              text: m.content,
+              time: formatTime(m.created_at),
+              read: true,
+            })))
+            setHasSentFirst(true)
+          } else {
+            const greetText = GREETING_MESSAGES.today_first
+            setMessages([{ id: Date.now(), role: 'dali', text: greetText, time: formatTime() }])
+          }
           return
         }
       } catch {}
+      // 활성 세션 없음 → 새 세션 시작
+      startSession(locState.emotion)
     }
-    startSession(locState.emotion)
+    restoreOrStart()
   }, [authLoading])
 
   /* ── 메시지 / 입력 상태 ── */
@@ -203,12 +219,6 @@ const Chat = () => {
   // messagesRef 동기화 — sendBatch 파라미터 이름 충돌 회피용
   useEffect(() => { messagesRef.current = messages }, [messages])
 
-  // sessionStorage 동기화 — sessionId·messages·greetingType·alertContext 저장
-  useEffect(() => {
-    if (!sessionId) return
-    sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ sessionId, messages, greetingType, alertContext }))
-  }, [sessionId, messages, greetingType, alertContext])
-
   /* ── 세션 종료 핸들러 ── */
   const handleEndSession = async () => {
     if (isEnding) return
@@ -216,7 +226,6 @@ const Chat = () => {
     if (sessionId) {
       try { await sessionApi.endSession(sessionId) } catch {}
     }
-    sessionStorage.removeItem(STORAGE_KEY)
     sessionIdRef.current = null
     setSessionId(null)
     setIsEnding(false)
