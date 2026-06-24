@@ -86,6 +86,7 @@ async def build_chat_reply(
         emotion, current_emotion_analysis, alert_context, recent_summaries, q3_answer,
         cautious_mode=cautious_mode,
     )
+    print(f"[pipeline] persona={persona!r}  system_prompt_preview={system_content[:120]!r}", flush=True)
     messages.append({"role": "system", "content": system_content})
 
     messages.extend(_fewshot_messages(persona_data, emotion))
