@@ -34,22 +34,22 @@ def _build_system_message(persona_data: dict) -> str:
     return f"{persona_data['system']}\n\n말투: {tone}\n\n지침:\n{rules_text}"
 
 
-def _fewshot_messages(persona_data: dict, emotion: str | None) -> list[dict]:
-    """페르소나 JSON의 fewshot에서 현재 감정에 맞는 예시를 우선 선택."""
+def _fewshot_block(persona_data: dict, emotion: str | None) -> str:
+    """페르소나 few-shot을 시스템 메시지 안 텍스트 블록으로 반환 (메시지 오염 방지)."""
     examples: list[dict] = persona_data.get("fewshot", [])
     if not examples:
-        return []
+        return ""
 
     matched = [e for e in examples if e.get("감정") == emotion]
-    others = [e for e in examples if e.get("감정") != emotion]
+    others  = [e for e in examples if e.get("감정") != emotion]
     random.shuffle(others)
     selected = (matched + others)[:2]
 
-    messages: list[dict] = []
+    lines = ["\n\n[응답 예시 — 실제 대화가 아님, 말투·분위기만 참고할 것]"]
     for ex in selected:
-        messages.append({"role": "user", "content": ex["사용자 발화"]})
-        messages.append({"role": "assistant", "content": ex["코치 응답"]})
-    return messages
+        lines.append(f'사용자: "{ex["사용자 발화"]}"')
+        lines.append(f'달리: "{ex["코치 응답"]}"')
+    return "\n".join(lines)
 
 
 async def build_chat_reply(
@@ -86,10 +86,9 @@ async def build_chat_reply(
         emotion, current_emotion_analysis, alert_context, recent_summaries, q3_answer,
         cautious_mode=cautious_mode,
     )
+    system_content += _fewshot_block(persona_data, emotion)
     print(f"[pipeline] persona={persona!r}  system_prompt_preview={system_content[:120]!r}", flush=True)
     messages.append({"role": "system", "content": system_content})
-
-    messages.extend(_fewshot_messages(persona_data, emotion))
 
     if history:
         trimmed = history[-(MAX_HISTORY_TURNS * 2):]

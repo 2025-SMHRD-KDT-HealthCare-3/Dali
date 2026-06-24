@@ -274,6 +274,7 @@ const Chat = () => {
       }
 
       const res = await chatApi.sendMessage(body)
+      console.log('[chat response]', res)
 
       if (res.should_block_chat) {
         setIsRisk(true)
