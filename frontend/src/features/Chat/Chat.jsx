@@ -281,7 +281,7 @@ const Chat = () => {
         setSessionId(null)
         sessionIdRef.current = null
         pendingQueueRef.current = []
-        addDali('지금 많이 힘드신 것 같아요. 혼자 버티지 않아도 돼요.\n\n📞 자살예방상담전화: 1393\n📞 정신건강위기상담전화: 1577-0199\n\n언제든 다시 찾아와 주세요 🌙')
+        addDali(res.reply || '지금 많이 힘드신 것 같아요. 혼자 버티지 않아도 돼요.\n\n📞 자살예방상담전화: 1393\n📞 정신건강위기상담전화: 1577-0199\n\n언제든 다시 찾아와 주세요 🌙')
       } else {
         addDali(res.reply || '...')
       }

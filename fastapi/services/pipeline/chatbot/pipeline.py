@@ -28,10 +28,18 @@ def _load_persona(persona: str) -> dict:
         return json.load(f)
 
 
+_GLOBAL_RULES = (
+    "- 응급·위기상담 전화번호(109, 1393, 1577-0199 등)를 직접 응답에 포함하지 않는다. "
+    "긴급 지원 안내는 시스템이 별도로 처리한다.\n"
+    "- 사용자가 자해·자살·자기 파괴 관련 표현을 직접 언급하지 않는 한, "
+    "자해·자살 의향을 스스로 먼저 묻지 않는다."
+)
+
+
 def _build_system_message(persona_data: dict) -> str:
     rules_text = "\n".join(f"- {r}" for r in persona_data.get("rules", []))
     tone = persona_data.get("tone", "")
-    return f"{persona_data['system']}\n\n말투: {tone}\n\n지침:\n{rules_text}"
+    return f"{persona_data['system']}\n\n말투: {tone}\n\n지침:\n{rules_text}\n{_GLOBAL_RULES}"
 
 
 def _fewshot_block(persona_data: dict, emotion: str | None) -> str:
