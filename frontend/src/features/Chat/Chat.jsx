@@ -146,12 +146,33 @@ const Chat = () => {
   useEffect(() => {
     if (authLoading) return
 
-    // 비회원: sessionStorage 복원 없이 항상 first_visit 인사로 시작
+    // 비회원: dali_guest_profile이 없거나 만료됐으면 온보딩으로 이동
     if (!isAuthenticated) {
+      const guestRaw = sessionStorage.getItem('dali_guest_profile')
+      let guestValid = false
+      if (guestRaw) {
+        try {
+          const p = JSON.parse(guestRaw)
+          if (!p.expires || Date.now() < p.expires) {
+            guestValid = true
+          } else {
+            sessionStorage.removeItem('dali_guest_profile')
+          }
+        } catch {
+          sessionStorage.removeItem('dali_guest_profile')
+        }
+      }
+      if (!guestValid) {
+        navigate('/onboarding', { replace: true, state: { returnEmotion: locState.emotion } })
+        return
+      }
       setGreetingType('first_visit')
       setMessages([{ id: Date.now(), role: 'dali', text: GREETING_MESSAGES.first_visit, time: formatTime() }])
       return
     }
+
+    // 온보딩 미완료 회원은 Effect 1이 /onboarding으로 이동시키므로 여기서 중단
+    if (user && !user.onboarding_completed) return
 
     // 회원: sessionStorage 복원 or 신규 세션 시작
     const saved = sessionStorage.getItem(STORAGE_KEY)
@@ -186,11 +207,11 @@ const Chat = () => {
 
   /* ── 세션 종료 핸들러 ── */
   const handleEndSession = async () => {
-    if (!sessionId || isEnding) return
+    if (isEnding) return
     setIsEnding(true)
-    try {
-      await sessionApi.endSession(sessionId)
-    } catch {}
+    if (sessionId) {
+      try { await sessionApi.endSession(sessionId) } catch {}
+    }
     sessionStorage.removeItem(STORAGE_KEY)
     sessionIdRef.current = null
     setSessionId(null)
@@ -444,7 +465,7 @@ const Chat = () => {
         <button
           className="chat-end-btn"
           onClick={handleEndSession}
-          disabled={isEnding || !sessionId}
+          disabled={isEnding}
         >
           {isEnding ? '종료 중' : '종료하기'}
         </button>
