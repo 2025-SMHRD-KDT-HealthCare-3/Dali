@@ -104,6 +104,7 @@ const Report = () => {
   const { isAuthenticated } = useAuth()
 
   const [activeTab,      setActiveTab]      = useState('daily')
+  const [focusEmotion,   setFocusEmotion]   = useState(null)   // 월간 감정 변화 포커스
   const [currentDate,    setCurrentDate]    = useState(new Date())
   const [currentMonth,   setCurrentMonth]   = useState(new Date(TODAY.getFullYear(), TODAY.getMonth(), 1))
   const [dailyReports,   setDailyReports]   = useState([])
@@ -129,6 +130,7 @@ const Report = () => {
         ).then(results => {
           const map = {}
           ids.forEach((id, i) => { map[id] = results[i].analyses || [] })
+          console.log('[report] sessionAnalyses', map)
           setSessionAnalyses(map)
         })
       })
@@ -373,7 +375,9 @@ const Report = () => {
                             {userLinePath  && <path d={userLinePath}  fill="none" stroke={ue?.color  || '#ccc'} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />}
                             {modelLinePath && <path d={modelLinePath} fill="none" stroke={me?.color || '#ccc'} strokeWidth="2"   strokeLinecap="round" strokeLinejoin="round" strokeDasharray="6 3" />}
                             {analysesLoaded && !userLinePath && !modelLinePath && (
-                              <text x="150" y="55" textAnchor="middle" fill="currentColor" fontSize="11" opacity="0.35">감정 분석 데이터가 없어요</text>
+                              <text x="150" y="55" textAnchor="middle" fill="currentColor" fontSize="11" opacity="0.35">
+                                {analyses.length < 2 ? '대화가 짧아 그래프를 그릴 수 없어요' : '감정 분석 데이터가 없어요'}
+                              </text>
                             )}
                             {!analysesLoaded && (
                               <text x="150" y="55" textAnchor="middle" fill="currentColor" fontSize="11" opacity="0.35">불러오는 중...</text>
@@ -502,24 +506,45 @@ const Report = () => {
                     <h3 className="rp-data-title">월간 감정 변화</h3>
                     <div className="rp-trend-graph">
                       <svg viewBox="0 0 300 100" preserveAspectRatio="none">
-                        {Object.entries(monthlyTrendData).map(([emotion, data]) => (
-                          <path
-                            key={emotion}
-                            d={generateTrendLinePath(data)}
-                            stroke={EMOTIONS[emotion]?.color || '#ccc'}
-                            strokeWidth="2.5"
-                            fill="none"
-                          />
-                        ))}
+                        {Object.entries(monthlyTrendData).map(([emotion, data]) => {
+                          const isFocused = focusEmotion === emotion
+                          const isOther   = focusEmotion && !isFocused
+                          const path      = generateTrendLinePath(data)
+                          if (!path) return null
+                          return (
+                            <path
+                              key={emotion}
+                              d={path}
+                              stroke={EMOTIONS[emotion]?.color || '#ccc'}
+                              strokeWidth={isFocused ? 3 : isOther ? 1 : 2.5}
+                              opacity={isOther ? 0.15 : 1}
+                              fill="none"
+                              style={{ transition: 'opacity 0.2s, stroke-width 0.2s' }}
+                            />
+                          )
+                        })}
                       </svg>
                     </div>
+                    {focusEmotion && (
+                      <p className="rp-trend-focus-label" style={{ color: EMOTIONS[focusEmotion]?.color }}>
+                        {EMOTIONS[focusEmotion]?.emoji} {focusEmotion}
+                      </p>
+                    )}
                     <div className="rp-legend" style={{ marginTop: 10 }}>
                       {Object.keys(EMOTIONS).map(label => (
-                        <span key={label} className="rp-legend-item">
+                        <span
+                          key={label}
+                          className={`rp-legend-item rp-legend-btn${focusEmotion === label ? ' active' : ''}`}
+                          style={{ opacity: focusEmotion && focusEmotion !== label ? 0.35 : 1 }}
+                          onClick={() => setFocusEmotion(prev => prev === label ? null : label)}
+                        >
                           <span className="rp-dot" style={{ background: EMOTIONS[label]?.color }} />{label}
                         </span>
                       ))}
                     </div>
+                    {focusEmotion && (
+                      <button className="rp-trend-reset" onClick={() => setFocusEmotion(null)}>전체 보기</button>
+                    )}
                   </div>
                 )}
 

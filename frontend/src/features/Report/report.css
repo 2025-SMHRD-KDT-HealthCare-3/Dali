@@ -484,6 +484,36 @@
   display: block;
 }
 
+.rp-legend-btn {
+  cursor: pointer;
+  transition: opacity 0.2s;
+  user-select: none;
+  padding: 2px 6px;
+  border-radius: 12px;
+}
+.rp-legend-btn:hover  { opacity: 0.8 !important; }
+.rp-legend-btn.active { background: rgba(255,255,255,0.1); }
+
+.rp-trend-focus-label {
+  text-align: center;
+  font-size: 14px;
+  font-weight: 600;
+  margin: 4px 0 0;
+}
+
+.rp-trend-reset {
+  display: block;
+  margin: 8px auto 0;
+  padding: 4px 14px;
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 20px;
+  background: transparent;
+  color: rgba(255,255,255,0.6);
+  font-size: 12px;
+  cursor: pointer;
+}
+.rp-trend-reset:hover { background: rgba(255,255,255,0.08); }
+
 
 /* ═══════════════════════════════════════════
    감정 주의 신호 이력
