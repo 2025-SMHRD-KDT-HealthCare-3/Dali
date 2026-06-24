@@ -322,6 +322,9 @@ const Onboarding = () => {
           userApi.updatePersona(personaToSave).catch(err =>
             console.error('[onboarding] updatePersona failed:', err)
           )
+        } else {
+          const existing = JSON.parse(sessionStorage.getItem('dali_guest_profile') || '{}')
+          sessionStorage.setItem('dali_guest_profile', JSON.stringify({ ...existing, persona: personaToSave }))
         }
         if (returnEmotion) {
           navigate('/chat', { state: { emotion: returnEmotion } })

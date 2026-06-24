@@ -230,6 +230,10 @@ const Chat = () => {
     try {
       const body = { utterance }
       if (isAuthenticated && sessionIdRef.current) body.session_id = sessionIdRef.current
+      if (!isAuthenticated) {
+        const guest = JSON.parse(sessionStorage.getItem('dali_guest_profile') || '{}')
+        if (guest.persona) body.persona = guest.persona
+      }
 
       const res = await chatApi.sendMessage(body)
 
