@@ -22,7 +22,6 @@
  *
  * [온보딩]
  * - POST   /api/onboarding                        초기 설문 저장/수정 (upsert)
- * - GET    /api/onboarding/me                     내 온보딩 답변 조회
  *
  * [세션]
  * - POST   /api/sessions                          감정 선택 및 세션 시작
@@ -115,7 +114,6 @@ router.patch('/users/me/persona', requireLogin, authCtrl.updatePersona);
 router.delete('/users/me', requireLogin, authCtrl.deleteMe);
 
 // 온보딩
-router.get('/onboarding/me', requireLogin, onboardingCtrl.getMyOnboarding);
 router.post('/onboarding', optionalLogin, onboardingCtrl.saveOnboarding);
 
 // 세션 (감정 선택) - 회원 전용

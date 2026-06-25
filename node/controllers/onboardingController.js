@@ -1,7 +1,6 @@
 /*
  * onboardingController - 온보딩 초기 설문
  * - saveOnboarding   : POST /api/onboarding     전체 답변 한꺼번에 저장 + 페르소나 추천 반환
- * - getMyOnboarding  : GET  /api/onboarding/me  내 온보딩 답변 조회
  *
  * question_no 매핑: 1=마음상태, 2=에너지, 3=신경쓰이는영역(LLM 컨텍스트), 4=코칭스타일
  * 페르소나 계산: q1(+2), q2(+1), q4(+3) 가중치 합산 / 동점 시 q4 우선
@@ -99,9 +98,4 @@ async function saveOnboarding(req, res) {
   res.status(201).json({ recommended_persona });
 }
 
-async function getMyOnboarding(req, res) {
-  const answers = await onboardingRepo.findAllByUser(req.user.user_id);
-  res.json({ onboarding: answers });
-}
-
-module.exports = { saveOnboarding, getMyOnboarding };
+module.exports = { saveOnboarding };
