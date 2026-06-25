@@ -6,37 +6,11 @@ import { useAuth } from '../../contexts/AuthContext'
 import ThemeToggle from '../Public/ThemeToggle'
 import StarBg     from '../Public/StarBg'
 import { userApi } from '../../api/user'
-import { onboardingApi } from '../../api/onboarding'
 import { authApi } from '../../api/auth'
 
 const GENDER_OPTS = ['여성', '남성', '응답 안 함']
 const GENDER_TO_DB = { '여성': 'F', '남성': 'M' }
 const GENDER_FROM_DB = { F: '여성', M: '남성' }
-
-const ENERGY_OPTS = [
-  '일상적인 일을 해낼 만큼 활력이 있어요',
-  '생각이 많고 복잡해서 정신적인 에너지가 부족해요',
-  '꼭 해야 할 일만 겨우 하거나 자꾸 미루게 돼요',
-  '하루를 버티는 것도 힘들어요',
-]
-
-const TOPIC_OPTS = [
-  '학업 및 진로 방향',
-  '직장 업무와 성과',
-  '가족, 친구, 연인 등 대인관계',
-  '나 자신에 대한 성격이나 자존감',
-  '특별한 고민은 없어요',
-]
-
-// 페르소나 → Q4 인덱스 (saveAll에서 q4 계산용)
-const PERSONA_TO_Q4 = { '친구형': 1, '분석형': 2, '동기부여형': 3, '공감형': 4 }
-
-const EMOTION_STATE_OPTS = [
-  '생각이 많고 복잡해요',
-  '마음이 조금 지쳐있어요',
-  '아무것도 하기 싫어요',
-  '편하게 이야기하고 싶어요',
-]
 
 // 백엔드 persona 값 기준
 const PERSONAS = [
@@ -66,11 +40,6 @@ const Info = () => {
   const [pwSending, setPwSending] = useState(false)
   const [pwMsg,     setPwMsg]     = useState('')
 
-  // 온보딩 정보
-  const [emotionState, setEmotionState] = useState('')
-  const [energy,       setEnergy]       = useState('')
-  const [topic,        setTopic]        = useState('')
-
   // 페르소나
   const [persona, setPersona] = useState('')
 
@@ -92,18 +61,6 @@ const Info = () => {
       } catch {
         setError('사용자 정보를 불러오는 데 실패했습니다.')
       }
-
-      // 온보딩 답변 로드
-      try {
-        const obRes = await onboardingApi.getAnswers()
-        const list = Array.isArray(obRes?.onboarding) ? obRes.onboarding : []
-        list.forEach(({ question_no, user_answer }) => {
-          const idx = user_answer - 1
-          if (question_no === 1 && EMOTION_STATE_OPTS[idx]) setEmotionState(EMOTION_STATE_OPTS[idx])
-          if (question_no === 2 && ENERGY_OPTS[idx])        setEnergy(ENERGY_OPTS[idx])
-          if (question_no === 3 && TOPIC_OPTS[idx])         setTopic(TOPIC_OPTS[idx])
-        })
-      } catch {}
 
       setPageLoading(false)
     }
@@ -131,15 +88,6 @@ const Info = () => {
       // 페르소나 저장
       if (persona && persona !== user?.persona) {
         await userApi.updatePersona(persona)
-      }
-
-      // 온보딩 답변 저장 — q4는 페르소나 선택에서 역산
-      const q1 = emotionState ? EMOTION_STATE_OPTS.indexOf(emotionState) + 1 : 0
-      const q2 = energy       ? ENERGY_OPTS.indexOf(energy)              + 1 : 0
-      const q3 = topic        ? TOPIC_OPTS.indexOf(topic)                + 1 : 0
-      const q4 = PERSONA_TO_Q4[persona] || 0
-      if (q1 && q2 && q3 && q4) {
-        try { await onboardingApi.saveAll({ q1, q2, q3, q4 }) } catch {}
       }
 
       setUser(prev => ({
@@ -264,39 +212,6 @@ const Info = () => {
             {pwSending ? '발송 중...' : '비밀번호 재설정 이메일 받기'}
           </button>
           {pwMsg && <p className="info-pw-msg">{pwMsg}</p>}
-        </section>
-
-        {/* ── 온보딩 정보 ── */}
-        <section className="info-section">
-          <h2 className="info-sec-title">온보딩 정보</h2>
-
-          <div className="info-field">
-            <label className="info-label">요즘 당신의 마음</label>
-            <div className="info-chips info-chips--col">
-              {EMOTION_STATE_OPTS.map(opt => (
-                <button key={opt} className={`info-chip${emotionState === opt ? ' active' : ''}`} onClick={() => setEmotionState(opt)}>{opt}</button>
-              ))}
-            </div>
-          </div>
-
-          <div className="info-field">
-            <label className="info-label">하루 에너지 수준</label>
-            <div className="info-chips info-chips--col">
-              {ENERGY_OPTS.map(opt => (
-                <button key={opt} className={`info-chip${energy === opt ? ' active' : ''}`} onClick={() => setEnergy(opt)}>{opt}</button>
-              ))}
-            </div>
-          </div>
-
-          <div className="info-field">
-            <label className="info-label">최근 신경 쓰이는 영역</label>
-            <div className="info-chips info-chips--col">
-              {TOPIC_OPTS.map(opt => (
-                <button key={opt} className={`info-chip${topic === opt ? ' active' : ''}`} onClick={() => setTopic(opt)}>{opt}</button>
-              ))}
-            </div>
-          </div>
-
         </section>
 
         {/* ── 달리 페르소나 ── */}

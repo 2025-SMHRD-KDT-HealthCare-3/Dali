@@ -111,3 +111,6 @@
 [data-theme="light"] .ns-toggle {
   background: rgba(var(--rgb-black), 0.1);
 }
+[data-theme="light"] .ns-toggle.is-on {
+  background: linear-gradient(135deg, var(--color-purple-accent), var(--color-purple-glow));
+}
