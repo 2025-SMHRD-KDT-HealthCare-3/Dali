@@ -243,8 +243,8 @@
 
 .rp-math-graph {
   flex: 1;
-  height: 38px;
-  overflow: hidden;
+  height: 60px;
+  overflow: visible;
   display: flex;
   align-items: flex-end;
   margin-top: 10px;

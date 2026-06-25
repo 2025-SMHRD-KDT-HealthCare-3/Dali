@@ -52,9 +52,13 @@ const generateMathWave = (pct) => {
 
 const generateTrendLinePath = (data, width = 300, height = 100) => {
   if (!data || data.length < 2) return ''
+  const PAD  = 8   // 위아래 여백(SVG 단위) — 극단값에서 베지어 제어점이 뷰포트 밖으로 나가는 것을 방지
   const yMax = 100
   const xStep = width / (data.length - 1)
-  const points = data.map((d, i) => [i * xStep, height - (d / yMax) * height])
+  const points = data.map((d, i) => [
+    i * xStep,
+    (height - PAD) - (d / yMax) * (height - PAD * 2),
+  ])
 
   const controlPoint = (current, previous, next, reverse) => {
     const p = previous || current
@@ -370,7 +374,7 @@ const Report = () => {
                         </div>
 
                         <div className="rp-math-graph">
-                          <svg viewBox="0 0 300 100" className="rp-math-svg" preserveAspectRatio="none">
+                          <svg viewBox="0 0 300 100" className="rp-math-svg" preserveAspectRatio="none" overflow="visible">
                             {userLinePath  && <path d={userLinePath}  fill="none" stroke={ue?.color  || '#ccc'} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />}
                             {modelLinePath && <path d={modelLinePath} fill="none" stroke={me?.color || '#ccc'} strokeWidth="2"   strokeLinecap="round" strokeLinejoin="round" strokeDasharray="6 3" />}
                             {analysesLoaded && !userLinePath && !modelLinePath && (
