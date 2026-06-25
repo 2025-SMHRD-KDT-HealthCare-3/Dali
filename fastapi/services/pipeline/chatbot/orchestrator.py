@@ -119,7 +119,6 @@ async def _cancel(task: asyncio.Task) -> None:
 
 async def run_chat(req: ChatRequest) -> dict:
     utterance = req.utterance or ""
-    print(f"[run_chat] persona={req.persona!r}  user_id={req.user_id}  history_len={len(req.history)}", flush=True)
 
     # 0) 감정분석 — 안전모드 분기에서도 Node의 chat_analyses 저장을 위해 항상 수행
     col_scores = _get_scores(utterance, req.history)
@@ -182,13 +181,6 @@ async def run_chat(req: ChatRequest) -> dict:
 
     # 3) 서비스 상태 계산
     service_state = _derive_service_state(risk_level, req.prior_risk_count, matched_category)
-    print(
-        f"[pipeline] risk_level={risk_level!r}  matched_category={matched_category!r}  "
-        f"service_action={service_state['service_action']!r}  "
-        f"response_mode={service_state['response_mode']!r}  "
-        f"should_block_chat={service_state['should_block_chat']}",
-        flush=True,
-    )
 
     judge_factors = (
         {k: risk.get(k) for k in _JUDGE_FACTOR_KEYS}

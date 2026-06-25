@@ -95,7 +95,6 @@ async def build_chat_reply(
         cautious_mode=cautious_mode,
     )
     system_content += _fewshot_block(persona_data, emotion)
-    print(f"[pipeline] persona={persona!r}  system_prompt_preview={system_content[:120]!r}", flush=True)
     messages.append({"role": "system", "content": system_content})
 
     if history:

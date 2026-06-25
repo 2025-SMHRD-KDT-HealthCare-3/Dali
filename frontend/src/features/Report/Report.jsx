@@ -130,7 +130,6 @@ const Report = () => {
         ).then(results => {
           const map = {}
           ids.forEach((id, i) => { map[id] = results[i].analyses || [] })
-          console.log('[report] sessionAnalyses', map)
           setSessionAnalyses(map)
         })
       })
