@@ -49,7 +49,7 @@ async function findSessionById(session_id) {
 // chat_logs(발화)와 chat_analyses(감정 점수)를 JOIN해서 대화 히스토리 반환
 async function findMessagesBySession(session_id) {
   const [rows] = await pool.query(
-    `SELECT cl.log_id, cl.speaker AS role, cl.utterance AS content, cl.turn_idx, cl.spoken_at,
+    `SELECT cl.log_id, cl.speaker AS role, cl.utterance AS content, cl.turn_idx, cl.spoken_at AS created_at,
             ca.joy_score, ca.sad_score, ca.anxiety_score, ca.anger_score, ca.hurt_score, ca.embarrass_score
      FROM chat_logs cl
      LEFT JOIN chat_analyses ca ON cl.log_id = ca.log_id
