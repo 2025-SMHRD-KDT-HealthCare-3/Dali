@@ -212,37 +212,53 @@ async function chatRespond(req, res) {
 
   // 회원 + 세션이 있을 때만 DB 저장 — 위기 여부와 관계없이 동일하게 저장 (비회원은 저장 안 함)
   if (req.user && session_id) {
-    // 사용자 발화를 먼저 저장해 log_id를 확보한 뒤, 그 log_id로 감정점수를 연결
-    const [[{ turn_idx }]] = await pool.query(
-      'SELECT COALESCE(MAX(turn_idx), 0) + 1 AS turn_idx FROM chat_logs WHERE session_id = ?',
-      [session_id]
-    );
+    // 발화 + 감정점수 + AI답변을 하나의 트랜잭션으로 저장 (NFR-DE-005 원자성)
+    // → 중간에 실패하면 전체 롤백해 "발화만 있고 점수는 없는" 반쪽 데이터를 방지
+    // FastAPI 호출은 위에서 이미 끝났으므로 트랜잭션 안에 네트워크 대기가 없음(커넥션 점유 최소화)
+    const conn = await pool.getConnection();
+    try {
+      await conn.beginTransaction();
 
-    // 사용자 발화 저장 — req.body에서 온 데이터이므로 speaker는 항상 'user'
-    const [userLogResult] = await pool.query(
-      'INSERT INTO chat_logs (user_id, session_id, speaker, utterance, turn_idx) VALUES (?, ?, ?, ?, ?)',
-      [req.user.user_id, session_id, 'user', utterance, turn_idx]
-    );
-
-    // 감정점수 저장 — FastAPI가 개별 필드로 반환 (위기/일반 모두 포함)
-    await pool.query(
-      'INSERT INTO chat_analyses (user_id, log_id, joy_score, sad_score, anxiety_score, anger_score, hurt_score, embarrass_score) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      [req.user.user_id, userLogResult.insertId, joy_score ?? 0, sad_score ?? 0, anxiety_score ?? 0, anger_score ?? 0, hurt_score ?? 0, embarrass_score ?? 0]
-    );
-
-    // AI 답변 저장 — 위기/일반 모두 reply 필드 사용
-    if (reply) {
-      const [[{ ai_turn_idx }]] = await pool.query(
-        'SELECT COALESCE(MAX(turn_idx), 0) + 1 AS ai_turn_idx FROM chat_logs WHERE session_id = ?',
+      // 사용자 발화를 먼저 저장해 log_id를 확보한 뒤, 그 log_id로 감정점수를 연결
+      const [[{ turn_idx }]] = await conn.query(
+        'SELECT COALESCE(MAX(turn_idx), 0) + 1 AS turn_idx FROM chat_logs WHERE session_id = ?',
         [session_id]
       );
-      await pool.query(
+
+      // 사용자 발화 저장 — req.body에서 온 데이터이므로 speaker는 항상 'user'
+      const [userLogResult] = await conn.query(
         'INSERT INTO chat_logs (user_id, session_id, speaker, utterance, turn_idx) VALUES (?, ?, ?, ?, ?)',
-        [req.user.user_id, session_id, 'assistant', reply, ai_turn_idx]
+        [req.user.user_id, session_id, 'user', utterance, turn_idx]
       );
+
+      // 감정점수 저장 — FastAPI가 개별 필드로 반환 (위기/일반 모두 포함)
+      await conn.query(
+        'INSERT INTO chat_analyses (user_id, log_id, joy_score, sad_score, anxiety_score, anger_score, hurt_score, embarrass_score) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        [req.user.user_id, userLogResult.insertId, joy_score ?? 0, sad_score ?? 0, anxiety_score ?? 0, anger_score ?? 0, hurt_score ?? 0, embarrass_score ?? 0]
+      );
+
+      // AI 답변 저장 — 위기/일반 모두 reply 필드 사용
+      if (reply) {
+        const [[{ ai_turn_idx }]] = await conn.query(
+          'SELECT COALESCE(MAX(turn_idx), 0) + 1 AS ai_turn_idx FROM chat_logs WHERE session_id = ?',
+          [session_id]
+        );
+        await conn.query(
+          'INSERT INTO chat_logs (user_id, session_id, speaker, utterance, turn_idx) VALUES (?, ?, ?, ?, ?)',
+          [req.user.user_id, session_id, 'assistant', reply, ai_turn_idx]
+        );
+      }
+
+      await conn.commit();
+    } catch (err) {
+      await conn.rollback();
+      throw err;
+    } finally {
+      conn.release();
     }
 
-    // risk/critical이면 risk_events 저장, should_block_chat이면 세션 종료(안전모드 전환)
+    // risk_events 저장 / 세션 종료는 위 트랜잭션과 분리 (NFR-DE-005: 위기 이력은 별도 단위)
+    // → 발화 저장이 롤백돼도 위기 기록까지 함께 사라지지 않도록 트랜잭션 밖에 둔다
     await saveRiskEventIfNeeded({
       user_id: req.user.user_id,
       session_id, risk_level, matched_category, judge_factors, safety_mode_triggered,
@@ -368,34 +384,47 @@ async function chatAudio(req, res) {
           joy_score, sad_score, anxiety_score, anger_score, hurt_score, embarrass_score } = fastapiRes.data;
 
   // 회원 + 세션이 있을 때만 DB 저장 — 위기 여부와 관계없이 동일하게 저장
+  // 발화 + 감정점수 + AI답변을 하나의 트랜잭션으로 (NFR-DE-005 원자성, chatRespond와 동일)
   if (req.user && session_id) {
-    const [[{ turn_idx }]] = await pool.query(
-      'SELECT COALESCE(MAX(turn_idx), 0) + 1 AS turn_idx FROM chat_logs WHERE session_id = ?',
-      [session_id]
-    );
+    const conn = await pool.getConnection();
+    try {
+      await conn.beginTransaction();
 
-    // STT로 변환된 텍스트 저장 — 음성 파일 자체는 저장하지 않음
-    const [userLogResult] = await pool.query(
-      'INSERT INTO chat_logs (user_id, session_id, speaker, utterance, turn_idx) VALUES (?, ?, ?, ?, ?)',
-      [req.user.user_id, session_id, 'user', utterance, turn_idx]
-    );
-
-    // 감정점수 저장 — FastAPI가 개별 필드로 반환 (위기/일반 모두 포함)
-    await pool.query(
-      'INSERT INTO chat_analyses (user_id, log_id, joy_score, sad_score, anxiety_score, anger_score, hurt_score, embarrass_score) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      [req.user.user_id, userLogResult.insertId, joy_score ?? 0, sad_score ?? 0, anxiety_score ?? 0, anger_score ?? 0, hurt_score ?? 0, embarrass_score ?? 0]
-    );
-
-    // AI 답변 저장 — 위기/일반 모두 reply 필드 사용
-    if (reply) {
-      const [[{ ai_turn_idx }]] = await pool.query(
-        'SELECT COALESCE(MAX(turn_idx), 0) + 1 AS ai_turn_idx FROM chat_logs WHERE session_id = ?',
+      const [[{ turn_idx }]] = await conn.query(
+        'SELECT COALESCE(MAX(turn_idx), 0) + 1 AS turn_idx FROM chat_logs WHERE session_id = ?',
         [session_id]
       );
-      await pool.query(
+
+      // STT로 변환된 텍스트 저장 — 음성 파일 자체는 저장하지 않음
+      const [userLogResult] = await conn.query(
         'INSERT INTO chat_logs (user_id, session_id, speaker, utterance, turn_idx) VALUES (?, ?, ?, ?, ?)',
-        [req.user.user_id, session_id, 'assistant', reply, ai_turn_idx]
+        [req.user.user_id, session_id, 'user', utterance, turn_idx]
       );
+
+      // 감정점수 저장 — FastAPI가 개별 필드로 반환 (위기/일반 모두 포함)
+      await conn.query(
+        'INSERT INTO chat_analyses (user_id, log_id, joy_score, sad_score, anxiety_score, anger_score, hurt_score, embarrass_score) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        [req.user.user_id, userLogResult.insertId, joy_score ?? 0, sad_score ?? 0, anxiety_score ?? 0, anger_score ?? 0, hurt_score ?? 0, embarrass_score ?? 0]
+      );
+
+      // AI 답변 저장 — 위기/일반 모두 reply 필드 사용
+      if (reply) {
+        const [[{ ai_turn_idx }]] = await conn.query(
+          'SELECT COALESCE(MAX(turn_idx), 0) + 1 AS ai_turn_idx FROM chat_logs WHERE session_id = ?',
+          [session_id]
+        );
+        await conn.query(
+          'INSERT INTO chat_logs (user_id, session_id, speaker, utterance, turn_idx) VALUES (?, ?, ?, ?, ?)',
+          [req.user.user_id, session_id, 'assistant', reply, ai_turn_idx]
+        );
+      }
+
+      await conn.commit();
+    } catch (err) {
+      await conn.rollback();
+      throw err;
+    } finally {
+      conn.release();
     }
   }
 
