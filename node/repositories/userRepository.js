@@ -60,8 +60,35 @@ async function updatePassword(userId, hashedPwd) {
   await pool.query('UPDATE users SET pwd = ? WHERE user_id = ?', [hashedPwd, userId]);
 }
 
+// 회원탈퇴 — 자식 데이터를 FK 순서대로 모두 삭제한 뒤 users 삭제 (트랜잭션)
+// users를 참조하는 자식 테이블이 전부 ON DELETE RESTRICT라, 자식이 남아 있으면
+// DELETE FROM users가 FK 제약 위반으로 실패한다. → 대화 이력이 있는 회원은
+// 탈퇴가 불가능해지고, 민감 데이터(발화/감정/요약)도 파기되지 않는다.
+// 삭제 순서는 sessionRepository.resetUserData와 동일 (검증된 FK 의존 순서).
 async function deleteUser(userId) {
-  await pool.query('DELETE FROM users WHERE user_id = ?', [userId]);
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    await conn.query('DELETE ca FROM chat_analyses ca JOIN chat_logs cl ON ca.log_id = cl.log_id JOIN sessions s ON cl.session_id = s.session_id WHERE s.user_id = ?', [userId]);
+    await conn.query('DELETE cl FROM chat_logs cl JOIN sessions s ON cl.session_id = s.session_id WHERE s.user_id = ?', [userId]);
+    await conn.query('DELETE FROM reports WHERE user_id = ?', [userId]);
+    await conn.query('DELETE FROM session_analyses WHERE user_id = ?', [userId]);
+    await conn.query('DELETE FROM summaries WHERE user_id = ?', [userId]);
+    await conn.query('DELETE FROM missions WHERE user_id = ?', [userId]);
+    await conn.query('DELETE FROM risk_events WHERE user_id = ?', [userId]);
+    await conn.query('DELETE FROM sessions WHERE user_id = ?', [userId]);
+    await conn.query('DELETE FROM onboardings WHERE user_id = ?', [userId]);
+    await conn.query('DELETE FROM emotion_alerts WHERE user_id = ?', [userId]);
+    await conn.query('DELETE FROM users WHERE user_id = ?', [userId]);
+
+    await conn.commit();
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
+  }
 }
 
 async function findByProviderInfo(provider, snsId) {
