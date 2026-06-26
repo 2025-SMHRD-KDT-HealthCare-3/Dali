@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import './chat.css'
 import { sessionApi } from '../../api/sessions'
 import { chatApi } from '../../api/chat'
+import { emotionAlertApi } from '../../api/emotionAlerts'
 import { useAuth } from '../../contexts/AuthContext'
 import chatBgDark     from '../../assets/dark/챗봇 배경.png'
 import chatBgLight    from '../../assets/light/챗봇 배경 라이트.png'
@@ -133,6 +134,9 @@ const Chat = () => {
 
       if (type === 'emotion_alert' && alert) {
         setShowAlertCard(true)
+        if (alert.alert_id) {
+          emotionAlertApi.confirmAlert(alert.alert_id).catch(() => {})
+        }
       } else {
         const greetText = GREETING_MESSAGES[type] ?? GREETING_MESSAGES.today_first
         setMessages([{ id: Date.now(), role: 'dali', text: greetText, time: formatTime() }])
