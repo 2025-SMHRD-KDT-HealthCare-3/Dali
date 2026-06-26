@@ -128,6 +128,13 @@ async function chatRespond(req, res) {
     return res.status(400).json({ code: 'INVALID_REQUEST', message: 'utterance를 입력해주세요.' });
   }
 
+  // session_id가 있는데 req.user가 없으면 = 회원 대화 중 액세스 토큰이 만료된 것.
+  // optionalLogin은 만료 토큰을 조용히 비회원으로 통과시켜 발화가 저장되지 않으므로,
+  // 401을 반환해 프론트(client.js)의 자동 토큰 갱신 → 재요청을 유도한다. (게스트는 session_id가 없어 영향 없음)
+  if (session_id && !req.user) {
+    return res.status(401).json({ code: 'TOKEN_EXPIRED', message: '인증이 만료되었습니다. 다시 시도해주세요.' });
+  }
+
   // 회원 + 세션이 있을 때만 FastAPI 페이로드용 데이터 조회 (비회원은 DB 없이 LLM 응답만)
   // - messages   : 이전 대화 내역 (history 구성용)
   // - user        : 페르소나 조회
@@ -267,6 +274,12 @@ async function chatAudio(req, res) {
   }
 
   const { session_id } = req.body;
+
+  // session_id가 있는데 req.user가 없으면 = 회원 대화 중 액세스 토큰이 만료된 것.
+  // 401을 반환해 프론트의 자동 토큰 갱신 → 재요청을 유도한다. (chatRespond와 동일, STT 호출 전에 차단)
+  if (session_id && !req.user) {
+    return res.status(401).json({ code: 'TOKEN_EXPIRED', message: '인증이 만료되었습니다. 다시 시도해주세요.' });
+  }
 
   // multer가 메모리에 올려둔 음성 파일을 FormData로 감싸서 FastAPI STT 엔드포인트로 전송
   const form = new FormData();
