@@ -532,25 +532,32 @@ const Chat = () => {
 
       {/* 입력 바 */}
       <div className="chat-input-bar">
-        <input
-          className="chat-input"
-          type="text"
-          placeholder="메시지를 입력해 주세요..."
-          value={input}
-          onChange={handleInputChange}
-          onKeyDown={e => e.key === 'Enter' && handleEnter()}
-        />
-        <button
-          className={`chat-mic${isRecording ? ' chat-mic--recording' : ''}`}
-          onClick={handleMicClick}
-          aria-label={isRecording ? '녹음 중지' : '음성 입력'}
-          disabled={isRisk}
-        >
-          <MicIcon />
-        </button>
-        <button className="chat-send" onClick={handleSend} aria-label="전송">
-          <SendIcon />
-        </button>
+        {isRisk ? (
+          <div className="chat-blocked-pill">
+            🌙 마음이 조금 가라앉으면 다시 이야기해요
+          </div>
+        ) : (
+          <>
+            <input
+              className="chat-input"
+              type="text"
+              placeholder="메시지를 입력해 주세요..."
+              value={input}
+              onChange={handleInputChange}
+              onKeyDown={e => e.key === 'Enter' && handleEnter()}
+            />
+            <button
+              className={`chat-mic${isRecording ? ' chat-mic--recording' : ''}`}
+              onClick={handleMicClick}
+              aria-label={isRecording ? '녹음 중지' : '음성 입력'}
+            >
+              <MicIcon />
+            </button>
+            <button className="chat-send" onClick={handleSend} aria-label="전송">
+              <SendIcon />
+            </button>
+          </>
+        )}
       </div>
 
 

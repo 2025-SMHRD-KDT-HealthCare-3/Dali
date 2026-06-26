@@ -250,6 +250,32 @@
 .chat-send:active { transform: scale(0.93); }
 .chat-send:disabled { opacity: 0.35; cursor: not-allowed; box-shadow: none; }
 
+/* ── 채팅 차단 상태 필 ── */
+
+.chat-blocked-pill {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 14px 24px;
+  background: rgba(var(--rgb-purple-lavender), 0.1);
+  border: 1px solid rgba(var(--rgb-purple-lavender), 0.22);
+  border-radius: var(--radius-full);
+  color: rgba(var(--rgb-white), 0.58);
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: -0.1px;
+  pointer-events: none;
+  user-select: none;
+}
+
+[data-theme="light"] .chat-blocked-pill {
+  background: rgba(var(--rgb-purple-accent), 0.07);
+  border-color: rgba(var(--rgb-purple-accent), 0.18);
+  color: rgba(var(--rgb-primary), 0.5);
+}
+
 /* ── 온보딩 칩 (채팅 화면 내) ── */
 
 .chat-ob-chips {
