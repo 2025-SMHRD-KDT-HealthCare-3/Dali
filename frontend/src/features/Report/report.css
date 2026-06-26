@@ -637,6 +637,25 @@
   color: rgba(var(--rgb-white), 0.38);
 }
 
+.rp-alert-confirm-btn {
+  font-size: var(--fs-caption);
+  font-weight: var(--fw-bold);
+  padding: 4px 12px;
+  border-radius: 999px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  background: rgba(var(--rgb-purple-bright), 0.15);
+  border: 1px solid rgba(var(--rgb-purple-bright), 0.35);
+  color: var(--color-purple-lavender);
+  cursor: pointer;
+  transition: background 0.18s, border-color 0.18s;
+  font-family: inherit;
+}
+.rp-alert-confirm-btn:hover {
+  background: rgba(var(--rgb-purple-bright), 0.26);
+  border-color: rgba(var(--rgb-purple-bright), 0.55);
+}
+
 /* 빈 상태 */
 .rp-alert-empty {
   display: flex;
@@ -754,3 +773,12 @@
   color: rgba(var(--rgb-primary), 0.38);
 }
 [data-theme="light"] .rp-alert-empty  { color: rgba(var(--rgb-primary), 0.35); }
+[data-theme="light"] .rp-alert-confirm-btn {
+  background: rgba(var(--rgb-purple-accent), 0.08);
+  border-color: rgba(var(--rgb-purple-accent), 0.3);
+  color: var(--color-purple-accent);
+}
+[data-theme="light"] .rp-alert-confirm-btn:hover {
+  background: rgba(var(--rgb-purple-accent), 0.16);
+  border-color: rgba(var(--rgb-purple-accent), 0.5);
+}

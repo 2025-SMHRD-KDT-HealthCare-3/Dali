@@ -157,6 +157,17 @@ const Report = () => {
   useEffect(() => { loadDaily(currentDate)   }, [currentDate])
   useEffect(() => { loadMonthly(currentMonth) }, [currentMonth])
 
+  const handleConfirmAlert = async (id) => {
+    try {
+      await emotionAlertApi.confirmAlert(id)
+      setAlerts(prev => prev.map(a =>
+        a.e_alert_id === id ? { ...a, is_confirmed: 'Y' } : a
+      ))
+    } catch {
+      // 실패 시 무시 (다음 로드 시 서버 상태로 복원됨)
+    }
+  }
+
   /* 오늘 미션 조회 (미션 수행률용) */
   useEffect(() => {
     if (!isAuthenticated) return
@@ -591,9 +602,16 @@ const Report = () => {
                               </div>
                               <span className="rp-alert-date">{alertDate}</span>
                             </div>
-                            <span className={`rp-alert-badge${confirmed ? ' confirmed' : ''}`}>
-                              {confirmed ? '확인됨' : '미확인'}
-                            </span>
+                            {confirmed ? (
+                              <span className="rp-alert-badge confirmed">확인됨</span>
+                            ) : (
+                              <button
+                                className="rp-alert-confirm-btn"
+                                onClick={() => handleConfirmAlert(alert.e_alert_id)}
+                              >
+                                확인
+                              </button>
+                            )}
                           </div>
                         )
                       })}
