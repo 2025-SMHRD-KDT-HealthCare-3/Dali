@@ -140,7 +140,7 @@ async function chatRespond(req, res) {
   // - user        : 페르소나 조회
   // - session     : 선택 감정 조회
   // - alerts      : 미확인 감정 주의 신호 (alert_context)
-  // - summaries   : 최근 대화 요약 1-2개 (recent_summaries)
+  // - summaries   : 최근 세션 요약 5개 (recent_summaries)
   let messages = [], user = null, session = null, alerts = [], summaries = [], onboarding = [];
   let prior_risk_count = 0, is_in_safety_mode = false;  // 비회원/세션 없음 시 기본값
   if (req.user && session_id) {
@@ -149,7 +149,7 @@ async function chatRespond(req, res) {
       userRepo.findById(req.user.user_id),
       sessionRepo.findSessionById(session_id),
       emotionAlertRepo.findUnconfirmedByUserId(req.user.user_id),
-      summaryRepo.findRecentByUserId(req.user.user_id, 2),
+      summaryRepo.findRecentByUserId(req.user.user_id, 5),  // 최근 세션 요약 5개
       onboardingRepo.findAllByUser(req.user.user_id),  // q3(신경 쓰이는 영역) 조회용
       riskEventRepo.countRiskInSession(session_id),     // FastAPI prior_risk_count
       riskEventRepo.hasSafetyModeTriggered(session_id), // FastAPI is_in_safety_mode
@@ -327,7 +327,7 @@ async function chatAudio(req, res) {
       userRepo.findById(req.user.user_id),
       sessionRepo.findSessionById(session_id),
       emotionAlertRepo.findUnconfirmedByUserId(req.user.user_id),
-      summaryRepo.findRecentByUserId(req.user.user_id, 2),
+      summaryRepo.findRecentByUserId(req.user.user_id, 5),  // 최근 세션 요약 5개
       onboardingRepo.findAllByUser(req.user.user_id),  // q3(신경 쓰이는 영역) 조회용
       riskEventRepo.countRiskInSession(session_id),     // FastAPI prior_risk_count
       riskEventRepo.hasSafetyModeTriggered(session_id), // FastAPI is_in_safety_mode
