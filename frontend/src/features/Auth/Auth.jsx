@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams, useNavigate } from 'react-router-dom'
 import './Auth.css'
 import Login from './Login'
 import Signup from './Signup'
@@ -21,6 +21,7 @@ const Auth = () => {
     searchParams.get('tab') === 'signup' ? 'signup' : 'login'
   )
   const { isDark } = useTheme()
+  const navigate = useNavigate()
   const [notice, setNotice] = useState('')
 
   useEffect(() => {
@@ -43,7 +44,7 @@ const Auth = () => {
 
         <div className="auth-banner">
           <img src={isDark ? daliLogoDark : daliLogoLight} alt="Dali" className="auth-banner-img" />
-          <button className="auth-back-btn" onClick={() => window.history.back()}>
+          <button className="auth-back-btn" onClick={() => navigate('/')}>
             <BackIcon />
           </button>
         </div>
