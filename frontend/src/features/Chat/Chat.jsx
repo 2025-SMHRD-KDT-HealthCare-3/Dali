@@ -180,6 +180,12 @@ const Chat = () => {
 
     // 회원: DB에서 오늘 활성 세션 복원 or 신규 세션 시작
     const restoreOrStart = async () => {
+      // 종료하기 직후 재진입 시 복원 건너뜀 (race condition 방지)
+      if (locState?.freshStart) {
+        startSession(locState.emotion)
+        return
+      }
+
       try {
         const { sessions } = await sessionApi.getLatestSession()
         const latest = sessions?.[0]
@@ -227,13 +233,16 @@ const Chat = () => {
   const handleEndSession = async () => {
     if (isEnding) return
     setIsEnding(true)
-    if (sessionId) {
-      try { await sessionApi.endSession(sessionId) } catch {}
-    }
+    const endingId = sessionId
+    // UI 즉시 초기화 — API 완료 전에 다른 경로로 나가도 빈 상태 유지
     sessionIdRef.current = null
     setSessionId(null)
+    setMessages([])
+    if (endingId) {
+      try { await sessionApi.endSession(endingId) } catch {}
+    }
     setIsEnding(false)
-    navigate('/', { replace: true })
+    navigate('/', { replace: true, state: { freshStart: true } })
   }
 
   /* ── 감정 주의 카드 핸들러 ── */
