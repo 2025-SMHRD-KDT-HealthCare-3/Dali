@@ -35,7 +35,7 @@ async function findSummaryById(summary_id) {
 }
 
 // FastAPI에 전달할 recent_summaries 구성용 — 가장 최근 N개 요약 반환
-async function findRecentByUserId(user_id, limit = 2) {
+async function findRecentByUserId(user_id, limit = 5) {
   const [rows] = await pool.query(
     'SELECT context_summary, created_at FROM summaries WHERE user_id = ? ORDER BY created_at DESC LIMIT ?',
     [user_id, limit]
